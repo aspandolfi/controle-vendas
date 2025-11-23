@@ -403,7 +403,7 @@ jobs:
     needs: [detect-changes, pr-status]
     runs-on: ubuntu-latest
     if: |
-      needs.detect-changes.outputs.api == 'true' && needs.test-api.result == 'success'
+      needs.detect-changes.outputs.api == 'true' && needs.pr-status.result == 'success'
     environment:
       name: dev
     
@@ -485,8 +485,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       needs.detect-changes.outputs.web == 'true' &&
-      needs.version-check-web.result == 'success' &&
-      needs.build-and-test-web.result == 'success'
+      needs.pr-status.result == 'success'
     environment:
       name: dev
     
