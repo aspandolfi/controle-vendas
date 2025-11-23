@@ -1,4 +1,4 @@
-name: PR Validation - Build and Test
+name: Build, Test, Security Scan and Deploy
 
 on:
   pull_request:
