@@ -8,8 +8,6 @@ on:
   workflow_run:
     workflows: ["PR Validation - Build and Test"]
     types: [completed]
-    branches:
-      - 'feature/**'
 
 jobs:
   detect-changes:
