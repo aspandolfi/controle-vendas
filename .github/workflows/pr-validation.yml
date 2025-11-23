@@ -307,9 +307,59 @@ jobs:
             echo "### ❌ Tests Failed" >> $GITHUB_STEP_SUMMARY
           fi
 
+  codacy-security-scan:
+    name: Codacy Security Scan
+    needs: [detect-changes, test-api]
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.api == 'true'
+    
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Codacy Analysis CLI
+        uses: codacy/codacy-analysis-cli-action@master
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          verbose: true
+          output: results.sarif
+          format: sarif
+          gh-code-scanning-compat: true
+          max-allowed-issues: 2147483647
+        continue-on-error: true
+
+      - name: Upload SARIF results file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+
+      - name: Security Scan Summary
+        if: always()
+        run: |
+          echo "## 🔒 Codacy Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Scan Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "### ✅ Security Scan Completed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Results have been uploaded to GitHub Security tab." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Security Scan Completed with Issues" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Review the scan results in the Security tab for potential vulnerabilities." >> $GITHUB_STEP_SUMMARY
+          fi
+
   pr-status:
     name: PR Status Check
-    needs: [detect-changes, version-check-web, build-and-test-web, test-api]
+    needs: [detect-changes, version-check-web, build-and-test-web, test-api, codacy-security-scan]
     runs-on: ubuntu-latest
     if: always() && startsWith(github.head_ref, 'feature/')
     
@@ -337,6 +387,12 @@ jobs:
               echo "❌ API validation failed"
               echo "- Test: ${{ needs.test-api.result }}"
               FAILED=true
+            fi
+            
+            # Security scan is informational only (continue-on-error)
+            if [ "${{ needs.codacy-security-scan.result }}" == "failure" ]; then
+              echo "⚠️  Security scan found issues (non-blocking)"
+              echo "- Codacy Security Scan: ${{ needs.codacy-security-scan.result }}"
             fi
           fi
           
@@ -388,6 +444,14 @@ jobs:
               TEST_ICON="✅"
             fi
             echo "| Tests | $TEST_ICON ${{ needs.test-api.result }} |" >> $GITHUB_STEP_SUMMARY
+            
+            SECURITY_ICON="⚠️"
+            if [ "${{ needs.codacy-security-scan.result }}" == "success" ]; then
+              SECURITY_ICON="✅"
+            elif [ "${{ needs.codacy-security-scan.result }}" == "skipped" ]; then
+              SECURITY_ICON="⏭️"
+            fi
+            echo "| Security Scan | $SECURITY_ICON ${{ needs.codacy-security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
@@ -396,14 +460,24 @@ jobs:
             echo "### ❌ PR needs attention before merging" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ✅ PR is ready to merge!" >> $GITHUB_STEP_SUMMARY
+            
+            # Add security scan note if there were issues
+            if [ "$API_CHANGES" == "true" ] && [ "${{ needs.codacy-security-scan.result }}" == "failure" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **Note:** Security scan detected potential issues. Please review the Security tab before merging." >> $GITHUB_STEP_SUMMARY
+            fi
           fi
 
   deploy-api-dev:
     name: Deploy API to DEV
-    needs: [detect-changes, pr-status]
+    needs: [detect-changes, test-api, codacy-security-scan, pr-status]
     runs-on: ubuntu-latest
     if: |
-      needs.detect-changes.outputs.api == 'true' && needs.pr-status.result == 'success'
+      always() &&
+      needs.detect-changes.outputs.api == 'true' && 
+      needs.test-api.result == 'success' &&
+      (needs.codacy-security-scan.result == 'success' || needs.codacy-security-scan.result == 'failure') &&
+      needs.pr-status.result == 'success'
     environment:
       name: dev
     
@@ -481,10 +555,13 @@ jobs:
 
   deploy-web-dev:
     name: Deploy Web to DEV
-    needs: [detect-changes, pr-status]
+    needs: [detect-changes, version-check-web, build-and-test-web, pr-status]
     runs-on: ubuntu-latest
     if: |
+      always() &&
       needs.detect-changes.outputs.web == 'true' &&
+      needs.version-check-web.result == 'success' &&
+      needs.build-and-test-web.result == 'success' &&
       needs.pr-status.result == 'success'
     environment:
       name: dev
