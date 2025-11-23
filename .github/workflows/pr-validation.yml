@@ -28,8 +28,8 @@ jobs:
       - name: Get versions
         id: get-versions
         run: |
-          PR_VERSION=$(node -p "require('./package.json').version")
-          MAIN_VERSION=$(node -p "require('./main-branch/package.json').version")
+          PR_VERSION=$(node -p "require('./web/package.json').version")
+          MAIN_VERSION=$(node -p "require('./main-branch/web/package.json').version")
           
           echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
           echo "main_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
