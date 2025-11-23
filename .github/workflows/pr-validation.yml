@@ -29,15 +29,24 @@ jobs:
         id: get-versions
         run: |
           PR_VERSION=$(node -p "require('./web/package.json').version")
-          MAIN_VERSION=$(node -p "require('./main-branch/web/package.json').version")
+          
+          # Verifica se package.json existe na main
+          if [ -f "./main-branch/web/package.json" ]; then
+            MAIN_VERSION=$(node -p "require('./main-branch/web/package.json').version")
+            echo "main_exists=true" >> $GITHUB_OUTPUT
+            echo "📦 Main Version: $MAIN_VERSION"
+          else
+            MAIN_VERSION="0.0.0"
+            echo "main_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️  Main branch does not have package.json - skipping version check"
+          fi
           
           echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
           echo "main_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
-          
           echo "📦 PR Version: $PR_VERSION"
-          echo "📦 Main Version: $MAIN_VERSION"
 
       - name: Compare versions
+        if: steps.get-versions.outputs.main_exists == 'true'
         run: |
           PR_VERSION="${{ steps.get-versions.outputs.pr_version }}"
           MAIN_VERSION="${{ steps.get-versions.outputs.main_version }}"
@@ -65,26 +74,37 @@ jobs:
         run: |
           echo "## 📋 Version Check Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Main Branch Version:** \`${{ steps.get-versions.outputs.main_version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PR Branch Version:** \`${{ steps.get-versions.outputs.pr_version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           
-          PR_VERSION="${{ steps.get-versions.outputs.pr_version }}"
-          MAIN_VERSION="${{ steps.get-versions.outputs.main_version }}"
+          MAIN_EXISTS="${{ steps.get-versions.outputs.main_exists }}"
           
-          version_to_number() {
-            echo "$1" | awk -F. '{ printf("%d%03d%03d", $1, $2, $3) }'
-          }
-          
-          PR_NUM=$(version_to_number "$PR_VERSION")
-          MAIN_NUM=$(version_to_number "$MAIN_VERSION")
-          
-          if [ "$PR_NUM" -le "$MAIN_NUM" ]; then
-            echo "### ❌ Version Check Failed" >> $GITHUB_STEP_SUMMARY
+          if [ "$MAIN_EXISTS" == "true" ]; then
+            echo "- **Main Branch Version:** \`${{ steps.get-versions.outputs.main_version }}\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The PR version must be greater than the main branch version." >> $GITHUB_STEP_SUMMARY
+            
+            PR_VERSION="${{ steps.get-versions.outputs.pr_version }}"
+            MAIN_VERSION="${{ steps.get-versions.outputs.main_version }}"
+            
+            version_to_number() {
+              echo "$1" | awk -F. '{ printf("%d%03d%03d", $1, $2, $3) }'
+            }
+            
+            PR_NUM=$(version_to_number "$PR_VERSION")
+            MAIN_NUM=$(version_to_number "$MAIN_VERSION")
+            
+            if [ "$PR_NUM" -le "$MAIN_NUM" ]; then
+              echo "### ❌ Version Check Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "The PR version must be greater than the main branch version." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### ✅ Version Check Passed" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "### ✅ Version Check Passed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Main Branch Version:** N/A (package.json not found)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ Version Check Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Main branch does not have a package.json file. Version validation skipped." >> $GITHUB_STEP_SUMMARY
           fi
 
   build-and-test:
