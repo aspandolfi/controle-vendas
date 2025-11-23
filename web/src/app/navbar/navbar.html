@@ -1,0 +1,63 @@
+<!-- src/app/layout/navbar/navbar.component.html -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" routerLink="/">Controle de Vendas</a>
+
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#mainNavbar"
+      aria-controls="mainNavbar"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNavbar">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a
+            class="nav-link"
+            routerLink="/"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/clientes" routerLinkActive="active">
+            Clientes
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/vendas-prazo" routerLinkActive="active">
+            Vendas a Prazo
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/vendas-avulso" routerLinkActive="active">
+            Vendas Avulso
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/pagamentos" routerLinkActive="active">
+            Pagamentos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/usuarios" routerLinkActive="active">
+            Usuários
+          </a>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link btn btn-link text-danger" (click)="logout()">
+            Sair
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
