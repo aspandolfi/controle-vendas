@@ -307,6 +307,22 @@ jobs:
             echo "### ❌ Tests Failed" >> $GITHUB_STEP_SUMMARY
           fi
 
+  trigger-dev-deployment:
+    name: Trigger Dev Deployment
+    needs: [detect-changes, version-check-web, build-and-test-web, test-api]
+    runs-on: ubuntu-latest
+    if: |
+      always() && 
+      startsWith(github.head_ref, 'feature/') &&
+      (needs.detect-changes.outputs.web != 'true' || needs.build-and-test-web.result == 'success') &&
+      (needs.detect-changes.outputs.api != 'true' || needs.test-api.result == 'success')
+    
+    steps:
+      - name: Dev deployment will trigger automatically
+        run: |
+          echo "✅ All checks passed - deployment to DEV will be triggered automatically"
+          echo "The 'Deploy' workflow will handle the deployment to development environment"
+
   pr-status:
     name: PR Status Check
     needs: [detect-changes, version-check-web, build-and-test-web, test-api]

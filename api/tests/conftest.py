@@ -4,11 +4,30 @@ Test configuration
 import os
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
-# Disable X-Ray tracing in tests
+# Set environment variables before any imports
 os.environ["POWERTOOLS_TRACE_DISABLED"] = "true"
 os.environ["AWS_XRAY_CONTEXT_MISSING"] = "LOG_ERROR"
+os.environ["DYNAMODB_TABLE_NAME"] = "test-table"
+os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 
 # Add src directory to Python path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
+
+# Mock aws_xray_sdk before imports
+mock_xray_recorder = MagicMock()
+mock_core = MagicMock()
+mock_core.xray_recorder = mock_xray_recorder
+sys.modules['aws_xray_sdk'] = MagicMock()
+sys.modules['aws_xray_sdk.core'] = mock_core
+
+# Mock boto3 before any imports
+mock_table = MagicMock()
+mock_dynamodb = MagicMock()
+mock_dynamodb.Table.return_value = mock_table
+
+mock_boto3 = MagicMock()
+mock_boto3.resource.return_value = mock_dynamodb
+sys.modules['boto3'] = mock_boto3

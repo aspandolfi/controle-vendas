@@ -77,3 +77,22 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+
+# Terraform
+*.tfvars
+!*.tfvars.example
+!api/infra/backends/*.tfvars
+!api/infra/environments/*.tfvars
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+deployment.zip

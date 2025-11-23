@@ -1,0 +1,283 @@
+name: Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+  workflow_run:
+    workflows: ["PR Validation - Build and Test"]
+    types: [completed]
+    branches: [feature/**]
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      environment: ${{ steps.determine-env.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ] && [ "${{ github.event.pull_request.merged }}" == "true" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "🚀 Deploying to PRODUCTION (PR merged to main)"
+          elif [ "${{ github.event_name }}" == "workflow_run" ] && [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "🧪 Deploying to DEVELOPMENT (PR validation passed)"
+          else
+            echo "environment=none" >> $GITHUB_OUTPUT
+            echo "⏭️  Skipping deployment (conditions not met)"
+          fi
+
+      - name: Detect file changes
+        id: filter
+        if: steps.determine-env.outputs.environment != 'none'
+        run: |
+          # Get changed files
+          git fetch origin main
+          
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For merged PRs, compare merge commit with main
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          else
+            # For workflow_run, get the head ref from the workflow
+            CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check for web changes
+          if echo "$CHANGED_FILES" | grep -q "^web/"; then
+            echo "web=true" >> $GITHUB_OUTPUT
+            echo "✅ Web changes detected"
+          else
+            echo "web=false" >> $GITHUB_OUTPUT
+            echo "⏭️  No web changes"
+          fi
+          
+          # Check for api changes
+          if echo "$CHANGED_FILES" | grep -q "^api/"; then
+            echo "api=true" >> $GITHUB_OUTPUT
+            echo "✅ API changes detected"
+          else
+            echo "api=false" >> $GITHUB_OUTPUT
+            echo "⏭️  No API changes"
+          fi
+
+  deploy-api:
+    name: Deploy API to ${{ needs.detect-changes.outputs.environment }}
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.api == 'true' && 
+      needs.detect-changes.outputs.environment != 'none'
+    environment:
+      name: ${{ needs.detect-changes.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Build Lambda deployment package
+        working-directory: ./api
+        run: |
+          chmod +x scripts/build.sh
+          ./scripts/build.sh
+
+      - name: Terraform Init
+        working-directory: ./api/infra
+        run: |
+          terraform init \
+            -backend-config="backends/${{ needs.detect-changes.outputs.environment }}.tfvars"
+
+      - name: Terraform Plan
+        working-directory: ./api/infra
+        run: |
+          terraform plan \
+            -var-file="environments/${{ needs.detect-changes.outputs.environment }}.tfvars" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./api/infra
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get API Gateway URL
+        id: get-url
+        working-directory: ./api/infra
+        run: |
+          API_URL=$(terraform output -raw api_gateway_url)
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "🌐 API URL: $API_URL"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 API Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "- **API URL:** ${{ steps.get-url.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deploy-web:
+    name: Deploy Web to ${{ needs.detect-changes.outputs.environment }}
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.web == 'true' && 
+      needs.detect-changes.outputs.environment != 'none'
+    environment:
+      name: ${{ needs.detect-changes.outputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Build project
+        working-directory: ./web
+        run: npm run build:prod
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Deploy to S3
+        working-directory: ./web
+        run: |
+          # TODO: Add S3 bucket deployment
+          echo "Web deployment to S3 - TO BE IMPLEMENTED"
+          echo "Environment: ${{ needs.detect-changes.outputs.environment }}"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deployment-status:
+    name: Deployment Status
+    needs: [detect-changes, deploy-api, deploy-web]
+    runs-on: ubuntu-latest
+    if: always() && needs.detect-changes.outputs.environment != 'none'
+    
+    steps:
+      - name: Check deployment status
+        run: |
+          API_CHANGES="${{ needs.detect-changes.outputs.api }}"
+          WEB_CHANGES="${{ needs.detect-changes.outputs.web }}"
+          ENV="${{ needs.detect-changes.outputs.environment }}"
+          
+          FAILED=false
+          
+          if [ "$API_CHANGES" == "true" ] && [ "${{ needs.deploy-api.result }}" != "success" ]; then
+            echo "❌ API deployment failed"
+            FAILED=true
+          fi
+          
+          if [ "$WEB_CHANGES" == "true" ] && [ "${{ needs.deploy-web.result }}" != "success" ]; then
+            echo "❌ Web deployment failed"
+            FAILED=true
+          fi
+          
+          if [ "$FAILED" == "true" ]; then
+            exit 1
+          else
+            echo "✅ All deployments successful to $ENV"
+          fi
+
+      - name: Final Summary
+        if: always()
+        run: |
+          echo "## 🎯 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`${{ needs.detect-changes.outputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          API_CHANGES="${{ needs.detect-changes.outputs.api }}"
+          WEB_CHANGES="${{ needs.detect-changes.outputs.web }}"
+          
+          if [ "$API_CHANGES" == "true" ]; then
+            echo "### 🔌 API Deployment" >> $GITHUB_STEP_SUMMARY
+            
+            API_ICON="❌"
+            if [ "${{ needs.deploy-api.result }}" == "success" ]; then
+              API_ICON="✅"
+            fi
+            echo "$API_ICON ${{ needs.deploy-api.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$WEB_CHANGES" == "true" ]; then
+            echo "### 🌐 Web Deployment" >> $GITHUB_STEP_SUMMARY
+            
+            WEB_ICON="❌"
+            if [ "${{ needs.deploy-web.result }}" == "success" ]; then
+              WEB_ICON="✅"
+            fi
+            echo "$WEB_ICON ${{ needs.deploy-web.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
