@@ -147,13 +147,13 @@ jobs:
 
       - name: Run tests
         working-directory: ./web
-        run: npm test -- --run
+        run: npm test
         env:
           CI: true
 
       - name: Build project
         working-directory: ./web
-        run: npm run build -- --configuration production
+        run: npm run build --configuration production
 
       - name: Check build output
         working-directory: ./web
