@@ -1,13 +1,10 @@
-name: Deploy
+name: Deploy to Production
 
 on:
   pull_request:
     branches:
       - main
     types: [closed]
-  workflow_run:
-    workflows: ["PR Validation - Build and Test"]
-    types: [completed]
 
 jobs:
   detect-changes:
@@ -24,36 +21,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine environment
+      - name: Check if PR was merged
         id: determine-env
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ] && [ "${{ github.event.pull_request.merged }}" == "true" ]; then
+          if [ "${{ github.event.pull_request.merged }}" == "true" ]; then
             echo "environment=prod" >> $GITHUB_OUTPUT
             echo "🚀 Deploying to PRODUCTION (PR merged to main)"
-          elif [ "${{ github.event_name }}" == "workflow_run" ] && [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
-            echo "environment=dev" >> $GITHUB_OUTPUT
-            echo "🧪 Deploying to DEVELOPMENT (after PR validation success)"
           else
             echo "environment=none" >> $GITHUB_OUTPUT
-            echo "⏭️  Skipping deployment (conditions not met)"
-            echo "Event: ${{ github.event_name }}"
-            echo "Workflow conclusion: ${{ github.event.workflow_run.conclusion }}"
+            echo "⏭️  Skipping deployment (PR was closed without merging)"
           fi
 
       - name: Detect file changes
         id: filter
         if: steps.determine-env.outputs.environment != 'none'
         run: |
-          # Get changed files
+          # Get changed files from merged PR
           git fetch origin main
-          
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # For merged PRs, compare merge commit with main
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-          else
-            # For workflow_run events, use the head branch
-            CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
-          fi
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           
           echo "Changed files:"
           echo "$CHANGED_FILES"
@@ -77,14 +62,14 @@ jobs:
           fi
 
   deploy-api:
-    name: Deploy API to ${{ needs.detect-changes.outputs.environment }}
+    name: Deploy API to PROD
     needs: detect-changes
     runs-on: ubuntu-latest
     if: |
       needs.detect-changes.outputs.api == 'true' && 
-      needs.detect-changes.outputs.environment != 'none'
+      needs.detect-changes.outputs.environment == 'prod'
     environment:
-      name: ${{ needs.detect-changes.outputs.environment }}
+      name: prod
     
     steps:
       - name: Checkout code
@@ -122,15 +107,12 @@ jobs:
       - name: Terraform Init
         working-directory: ./api/infra
         run: |
-          terraform init \
-            -backend-config="backends/${{ needs.detect-changes.outputs.environment }}.tfvars"
+          terraform init -backend-config="backends/prod.tfvars"
 
       - name: Terraform Plan
         working-directory: ./api/infra
         run: |
-          terraform plan \
-            -var-file="environments/${{ needs.detect-changes.outputs.environment }}.tfvars" \
-            -out=tfplan
+          terraform plan -var-file="environments/prod.tfvars" -out=tfplan
 
       - name: Terraform Apply
         working-directory: ./api/infra
@@ -147,9 +129,9 @@ jobs:
       - name: Deployment Summary
         if: always()
         run: |
-          echo "## 🚀 API Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 PROD API Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** prod" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ job.status }}" == "success" ]; then
@@ -162,14 +144,14 @@ jobs:
           fi
 
   deploy-web:
-    name: Deploy Web to ${{ needs.detect-changes.outputs.environment }}
+    name: Deploy Web to PROD
     needs: detect-changes
     runs-on: ubuntu-latest
     if: |
       needs.detect-changes.outputs.web == 'true' && 
-      needs.detect-changes.outputs.environment != 'none'
+      needs.detect-changes.outputs.environment == 'prod'
     environment:
-      name: ${{ needs.detect-changes.outputs.environment }}
+      name: prod
     
     steps:
       - name: Checkout code
@@ -202,14 +184,14 @@ jobs:
         run: |
           # TODO: Add S3 bucket deployment
           echo "Web deployment to S3 - TO BE IMPLEMENTED"
-          echo "Environment: ${{ needs.detect-changes.outputs.environment }}"
+          echo "Environment: prod"
 
       - name: Deployment Summary
         if: always()
         run: |
-          echo "## 🚀 Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 PROD Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** prod" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
@@ -253,9 +235,9 @@ jobs:
       - name: Final Summary
         if: always()
         run: |
-          echo "## 🎯 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 PROD Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** \`${{ needs.detect-changes.outputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`prod\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           API_CHANGES="${{ needs.detect-changes.outputs.api }}"

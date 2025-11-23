@@ -397,3 +397,145 @@ jobs:
           else
             echo "### ✅ PR is ready to merge!" >> $GITHUB_STEP_SUMMARY
           fi
+
+  deploy-api-dev:
+    name: Deploy API to DEV
+    needs: [detect-changes, pr-status]
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.api == 'true' &&
+      (needs.detect-changes.outputs.web != 'true' || needs.build-and-test-web.result == 'success') &&
+      needs.test-api.result == 'success'
+    environment:
+      name: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Build Lambda deployment package
+        working-directory: ./api
+        run: |
+          chmod +x scripts/build.sh
+          ./scripts/build.sh
+
+      - name: Terraform Init
+        working-directory: ./api/infra
+        run: |
+          terraform init -backend-config="backends/dev.tfvars"
+
+      - name: Terraform Plan
+        working-directory: ./api/infra
+        run: |
+          terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./api/infra
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get API Gateway URL
+        id: get-url
+        working-directory: ./api/infra
+        run: |
+          API_URL=$(terraform output -raw api_gateway_url)
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "🌐 API URL: $API_URL"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 DEV Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** dev" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "- **API URL:** ${{ steps.get-url.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deploy-web-dev:
+    name: Deploy Web to DEV
+    needs: [detect-changes, pr-status]
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.web == 'true' &&
+      needs.version-check-web.result == 'success' &&
+      needs.build-and-test-web.result == 'success'
+    environment:
+      name: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Build project
+        working-directory: ./web
+        run: npm run build:prod
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Deploy to S3
+        working-directory: ./web
+        run: |
+          # TODO: Add S3 bucket deployment
+          echo "Web deployment to S3 - TO BE IMPLEMENTED"
+          echo "Environment: dev"
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 DEV Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** dev" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          fi
