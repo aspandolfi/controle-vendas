@@ -153,7 +153,7 @@ jobs:
 
       - name: Build project
         working-directory: ./web
-        run: npm run build --configuration production
+        run: npm run build:prod
 
       - name: Check build output
         working-directory: ./web
