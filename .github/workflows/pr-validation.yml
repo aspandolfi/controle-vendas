@@ -7,10 +7,72 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  version-check:
-    name: Version Validation
+  detect-changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
     if: startsWith(github.head_ref, 'feature/')
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect file changes
+        id: filter
+        run: |
+          # Get changed files
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check for web changes
+          if echo "$CHANGED_FILES" | grep -q "^web/"; then
+            echo "web=true" >> $GITHUB_OUTPUT
+            echo "✅ Web changes detected"
+          else
+            echo "web=false" >> $GITHUB_OUTPUT
+            echo "⏭️  No web changes"
+          fi
+          
+          # Check for api changes
+          if echo "$CHANGED_FILES" | grep -q "^api/"; then
+            echo "api=true" >> $GITHUB_OUTPUT
+            echo "✅ API changes detected"
+          else
+            echo "api=false" >> $GITHUB_OUTPUT
+            echo "⏭️  No API changes"
+          fi
+
+      - name: Changes summary
+        run: |
+          echo "## 🔍 Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.filter.outputs.web }}" == "true" ]; then
+            echo "| 🌐 Web | ✅ Yes |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🌐 Web | ⏭️ No |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.filter.outputs.api }}" == "true" ]; then
+            echo "| 🔌 API | ✅ Yes |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔌 API | ⏭️ No |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  version-check-web:
+    name: Web Version Validation
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.web == 'true'
     
     steps:
       - name: Checkout PR branch
@@ -107,11 +169,11 @@ jobs:
             echo "Main branch does not have a package.json file. Version validation skipped." >> $GITHUB_STEP_SUMMARY
           fi
 
-  build-and-test:
-    name: Build and Test
-    needs: version-check
+  build-and-test-web:
+    name: Web Build and Test
+    needs: [detect-changes, version-check-web]
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'feature/')
+    if: needs.detect-changes.outputs.web == 'true'
     
     strategy:
       matrix:
@@ -190,23 +252,95 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: web-build-artifacts
           path: web/dist/
           retention-days: 7
 
+  test-api:
+    name: API Test
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.api == 'true'
+    
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            api/requirements.txt
+            api/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        working-directory: ./api
+        run: |
+          pytest tests/ -v --cov=src --cov-report=term-missing --cov-report=xml
+
+      - name: Test Summary
+        if: always()
+        working-directory: ./api
+        run: |
+          echo "## 🧪 API Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Version:** ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "coverage.xml" ]; then
+            echo "### ✅ Tests Passed with Coverage" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Tests Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
   pr-status:
     name: PR Status Check
-    needs: [version-check, build-and-test]
+    needs: [detect-changes, version-check-web, build-and-test-web, test-api]
     runs-on: ubuntu-latest
     if: always() && startsWith(github.head_ref, 'feature/')
     
     steps:
       - name: Check all jobs status
         run: |
-          if [ "${{ needs.version-check.result }}" != "success" ] || [ "${{ needs.build-and-test.result }}" != "success" ]; then
-            echo "❌ One or more jobs failed"
-            echo "- Version Check: ${{ needs.version-check.result }}"
-            echo "- Build and Test: ${{ needs.build-and-test.result }}"
+          WEB_CHANGES="${{ needs.detect-changes.outputs.web }}"
+          API_CHANGES="${{ needs.detect-changes.outputs.api }}"
+          
+          FAILED=false
+          
+          # Check web jobs if web changes detected
+          if [ "$WEB_CHANGES" == "true" ]; then
+            if [ "${{ needs.version-check-web.result }}" != "success" ] || [ "${{ needs.build-and-test-web.result }}" != "success" ]; then
+              echo "❌ Web validation failed"
+              echo "- Version Check: ${{ needs.version-check-web.result }}"
+              echo "- Build and Test: ${{ needs.build-and-test-web.result }}"
+              FAILED=true
+            fi
+          fi
+          
+          # Check api jobs if api changes detected
+          if [ "$API_CHANGES" == "true" ]; then
+            if [ "${{ needs.test-api.result }}" != "success" ]; then
+              echo "❌ API validation failed"
+              echo "- Test: ${{ needs.test-api.result }}"
+              FAILED=true
+            fi
+          fi
+          
+          if [ "$FAILED" == "true" ]; then
             exit 1
           else
             echo "✅ All checks passed successfully"
@@ -217,24 +351,49 @@ jobs:
         run: |
           echo "## 🎯 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           
-          VERSION_ICON="❌"
-          if [ "${{ needs.version-check.result }}" == "success" ]; then
-            VERSION_ICON="✅"
+          WEB_CHANGES="${{ needs.detect-changes.outputs.web }}"
+          API_CHANGES="${{ needs.detect-changes.outputs.api }}"
+          
+          # Web checks
+          if [ "$WEB_CHANGES" == "true" ]; then
+            echo "### 🌐 Web Validation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            
+            VERSION_ICON="❌"
+            if [ "${{ needs.version-check-web.result }}" == "success" ]; then
+              VERSION_ICON="✅"
+            fi
+            echo "| Version Check | $VERSION_ICON ${{ needs.version-check-web.result }} |" >> $GITHUB_STEP_SUMMARY
+            
+            BUILD_ICON="❌"
+            if [ "${{ needs.build-and-test-web.result }}" == "success" ]; then
+              BUILD_ICON="✅"
+            fi
+            echo "| Build and Test | $BUILD_ICON ${{ needs.build-and-test-web.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "| Version Check | $VERSION_ICON ${{ needs.version-check.result }} |" >> $GITHUB_STEP_SUMMARY
           
-          BUILD_ICON="❌"
-          if [ "${{ needs.build-and-test.result }}" == "success" ]; then
-            BUILD_ICON="✅"
+          # API checks
+          if [ "$API_CHANGES" == "true" ]; then
+            echo "### 🔌 API Validation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            
+            TEST_ICON="❌"
+            if [ "${{ needs.test-api.result }}" == "success" ]; then
+              TEST_ICON="✅"
+            fi
+            echo "| Tests | $TEST_ICON ${{ needs.test-api.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "| Build and Test | $BUILD_ICON ${{ needs.build-and-test.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ needs.version-check.result }}" == "success" ] && [ "${{ needs.build-and-test.result }}" == "success" ]; then
-            echo "### ✅ PR is ready to merge!" >> $GITHUB_STEP_SUMMARY
-          else
+          # Final status
+          if ([ "$WEB_CHANGES" == "true" ] && ([ "${{ needs.version-check-web.result }}" != "success" ] || [ "${{ needs.build-and-test-web.result }}" != "success" ])) || ([ "$API_CHANGES" == "true" ] && [ "${{ needs.test-api.result }}" != "success" ]); then
             echo "### ❌ PR needs attention before merging" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ PR is ready to merge!" >> $GITHUB_STEP_SUMMARY
           fi
