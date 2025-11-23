@@ -1,0 +1,213 @@
+name: PR Validation - Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  version-check:
+    name: Version Validation
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'feature/')
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-branch
+
+      - name: Get versions
+        id: get-versions
+        run: |
+          PR_VERSION=$(node -p "require('./package.json').version")
+          MAIN_VERSION=$(node -p "require('./main-branch/package.json').version")
+          
+          echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
+          echo "main_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "📦 PR Version: $PR_VERSION"
+          echo "📦 Main Version: $MAIN_VERSION"
+
+      - name: Compare versions
+        run: |
+          PR_VERSION="${{ steps.get-versions.outputs.pr_version }}"
+          MAIN_VERSION="${{ steps.get-versions.outputs.main_version }}"
+          
+          # Função para converter versão em número comparável
+          version_to_number() {
+            echo "$1" | awk -F. '{ printf("%d%03d%03d", $1, $2, $3) }'
+          }
+          
+          PR_NUM=$(version_to_number "$PR_VERSION")
+          MAIN_NUM=$(version_to_number "$MAIN_VERSION")
+          
+          echo "PR Version Number: $PR_NUM"
+          echo "Main Version Number: $MAIN_NUM"
+          
+          if [ "$PR_NUM" -le "$MAIN_NUM" ]; then
+            echo "❌ ERROR: PR version ($PR_VERSION) must be greater than main version ($MAIN_VERSION)"
+            exit 1
+          else
+            echo "✅ SUCCESS: PR version ($PR_VERSION) is greater than main version ($MAIN_VERSION)"
+          fi
+
+      - name: Version check summary
+        if: always()
+        run: |
+          echo "## 📋 Version Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Main Branch Version:** \`${{ steps.get-versions.outputs.main_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Branch Version:** \`${{ steps.get-versions.outputs.pr_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          PR_VERSION="${{ steps.get-versions.outputs.pr_version }}"
+          MAIN_VERSION="${{ steps.get-versions.outputs.main_version }}"
+          
+          version_to_number() {
+            echo "$1" | awk -F. '{ printf("%d%03d%03d", $1, $2, $3) }'
+          }
+          
+          PR_NUM=$(version_to_number "$PR_VERSION")
+          MAIN_NUM=$(version_to_number "$MAIN_VERSION")
+          
+          if [ "$PR_NUM" -le "$MAIN_NUM" ]; then
+            echo "### ❌ Version Check Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The PR version must be greater than the main branch version." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ Version Check Passed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  build-and-test:
+    name: Build and Test
+    needs: version-check
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'feature/')
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint check
+        run: npm run lint --if-present || echo "No lint script found, skipping..."
+        continue-on-error: true
+
+      - name: Run tests
+        run: npm test -- --run
+        env:
+          CI: true
+
+      - name: Build project
+        run: npm run build -- --configuration production
+
+      - name: Check build output
+        run: |
+          if [ -d "dist" ]; then
+            echo "✅ Build output directory exists"
+            du -sh dist
+            ls -la dist
+          else
+            echo "❌ Build output directory not found"
+            exit 1
+          fi
+
+      - name: Build and Test Summary
+        if: always()
+        run: |
+          echo "## 🏗️ Build and Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version:** ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "dist" ]; then
+            DIST_SIZE=$(du -sh dist | cut -f1)
+            echo "- **Build Output Size:** $DIST_SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  pr-status:
+    name: PR Status Check
+    needs: [version-check, build-and-test]
+    runs-on: ubuntu-latest
+    if: always() && startsWith(github.head_ref, 'feature/')
+    
+    steps:
+      - name: Check all jobs status
+        run: |
+          if [ "${{ needs.version-check.result }}" != "success" ] || [ "${{ needs.build-and-test.result }}" != "success" ]; then
+            echo "❌ One or more jobs failed"
+            echo "- Version Check: ${{ needs.version-check.result }}"
+            echo "- Build and Test: ${{ needs.build-and-test.result }}"
+            exit 1
+          else
+            echo "✅ All checks passed successfully"
+          fi
+
+      - name: Final Summary
+        if: always()
+        run: |
+          echo "## 🎯 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          VERSION_ICON="❌"
+          if [ "${{ needs.version-check.result }}" == "success" ]; then
+            VERSION_ICON="✅"
+          fi
+          echo "| Version Check | $VERSION_ICON ${{ needs.version-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          BUILD_ICON="❌"
+          if [ "${{ needs.build-and-test.result }}" == "success" ]; then
+            BUILD_ICON="✅"
+          fi
+          echo "| Build and Test | $BUILD_ICON ${{ needs.build-and-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.version-check.result }}" == "success" ] && [ "${{ needs.build-and-test.result }}" == "success" ]; then
+            echo "### ✅ PR is ready to merge!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ PR needs attention before merging" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,155 @@
+<section>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Clientes</h1>
+    <button type="button" class="btn btn-primary" (click)="startNew()">
+      Novo Cliente
+    </button>
+  </div>
+
+  <div class="row g-3">
+    <!-- Formulário -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">
+            {{ editingCustomer ? 'Editar Cliente' : 'Novo Cliente' }}
+          </h5>
+          <form [formGroup]="customerForm" (ngSubmit)="save()">
+            <div class="mb-3">
+              <label class="form-label">Nome</label>
+              <input
+                type="text"
+                class="form-control"
+                formControlName="name"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Telefone</label>
+              <input
+                type="text"
+                class="form-control"
+                formControlName="phone"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Endereço</label>
+              <input
+                type="text"
+                class="form-control"
+                formControlName="address"
+              />
+            </div>
+
+            <h6 class="mt-3">Pessoas autorizadas a comprar</h6>
+
+            <div formArrayName="authorizedPeople" class="mb-2">
+              <div
+                class="row g-2 align-items-end mb-2"
+                *ngFor="let ap of authorizedPeople.controls; index as i"
+                [formGroupName]="i"
+              >
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Nome</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="name"
+                  />
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Documento</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="document"
+                  />
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Telefone</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    formControlName="phone"
+                  />
+                </div>
+                <div class="col-12 col-md-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger w-100"
+                    (click)="removeAuthorizedPerson(i)"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm mb-3"
+              (click)="addAuthorizedPerson()"
+            >
+              + Adicionar autorizado
+            </button>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">
+                {{ editingCustomer ? 'Salvar alterações' : 'Cadastrar' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Lista de clientes</h5>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th>Endereço</th>
+                  <th>Saldo em aberto</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of customers">
+                  <td>{{ c.name }}</td>
+                  <td>{{ c.phone }}</td>
+                  <td>{{ c.address }}</td>
+                  <td>
+                    R$
+                    {{ getCustomerBalance(c.id) | number: '1.2-2' }}
+                  </td>
+                  <td class="text-end">
+                    <button
+                      type="button"
+                      class="btn btn-link btn-sm"
+                      (click)="edit(c)"
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="customers.length === 0">
+                  <td colspan="5" class="text-center text-muted">
+                    Nenhum cliente cadastrado.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

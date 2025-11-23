@@ -1,0 +1,83 @@
+<!-- src/app/pages/sales/cash-sales/cash-sales.component.html -->
+<section>
+  <h1 class="mb-3">Vendas Avulso</h1>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Nova venda avulsa</h5>
+
+          <form [formGroup]="saleForm" (ngSubmit)="saveSale()">
+            <div class="mb-3">
+              <label class="form-label">Descrição</label>
+              <input
+                type="text"
+                class="form-control"
+                formControlName="description"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Data</label>
+              <input
+                type="date"
+                class="form-control"
+                formControlName="date"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Valor</label>
+              <input
+                type="number"
+                step="0.01"
+                class="form-control"
+                formControlName="totalAmount"
+              />
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">
+                Registrar venda
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Histórico de vendas avulsas</h5>
+
+          <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let s of sales">
+                  <td>{{ s.date | date: 'dd/MM/yyyy' }}</td>
+                  <td>{{ s.description }}</td>
+                  <td>R$ {{ s.totalAmount | number: '1.2-2' }}</td>
+                </tr>
+                <tr *ngIf="sales.length === 0">
+                  <td colspan="3" class="text-center text-muted">
+                    Nenhuma venda avulsa registrada.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

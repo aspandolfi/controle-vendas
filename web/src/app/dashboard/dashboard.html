@@ -1,0 +1,98 @@
+<!-- src/app/pages/dashboard/dashboard.component.html -->
+<section>
+  <h1 class="mb-4">Dashboard</h1>
+
+  <!-- Filtro de Data Global -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <label for="startDate" class="form-label fw-bold">Data Inicial</label>
+      <input 
+        type="date" 
+        id="startDate" 
+        class="form-control" 
+        [(ngModel)]="startDate"
+        (change)="onFilterChange()"
+      />
+    </div>
+    <div class="col-md-3">
+      <label for="endDate" class="form-label fw-bold">Data Final</label>
+      <input 
+        type="date" 
+        id="endDate" 
+        class="form-control" 
+        [(ngModel)]="endDate"
+        (change)="onFilterChange()"
+      />
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Clientes cadastrados</h5>
+          <p class="display-6 mb-0">{{ customers.length }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Vendas registradas</h5>
+          <p class="display-6 mb-0">{{ sales.length }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Vendas à vista</h5>
+          <p class="display-6 mb-0">
+            R$
+            {{ cashSalesTotal | number: '1.2-2' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Saldo em aberto</h5>
+          <p class="display-6 mb-0">
+            R$
+            {{ totalOpenBalance | number: '1.2-2' }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Pagamentos realizados</h5>
+          <p class="display-6 mb-0">
+            R$
+            {{ paymentsTotal | number: '1.2-2' }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div style="height: 400px; position: relative;">
+            <canvas #salesChart></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
