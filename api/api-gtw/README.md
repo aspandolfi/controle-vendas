@@ -15,13 +15,13 @@ Após fazer deploy com `enable_api_docs = true`, você terá:
 1. **Swagger UI Interativo**: Interface web para explorar e testar a API
    ```bash
    terraform output swagger_ui_url
-   # http://controle-vendas-dev-api-docs.s3-website-us-east-1.amazonaws.com
+   # http://controle-vendas-dev-api-docs.s3-website-sa-east-1.amazonaws.com
    ```
 
 2. **Especificação OpenAPI (JSON)**:
    ```bash
    terraform output api_documentation_url
-   # https://abc123.execute-api.us-east-1.amazonaws.com/dev/openapi.json
+   # https://abc123.execute-api.sa-east-1.amazonaws.com/dev/openapi.json
    ```
 
 ### Arquivo Local

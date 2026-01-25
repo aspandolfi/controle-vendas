@@ -17,7 +17,7 @@
           "default": "api-id"
         },
         "region": {
-          "default": "us-east-1"
+          "default": "sa-east-1"
         },
         "stage": {
           "default": "dev"

@@ -12,7 +12,7 @@ import pytest
 os.environ["POWERTOOLS_TRACE_DISABLED"] = "true"
 os.environ["AWS_XRAY_CONTEXT_MISSING"] = "LOG_ERROR"
 os.environ["DYNAMODB_TABLE_NAME"] = "test-table"
-os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
+os.environ["AWS_DEFAULT_REGION"] = "sa-east-1"
 
 # Add src directory to Python path
 src_path = Path(__file__).parent.parent / "src"
@@ -63,7 +63,7 @@ def lambda_context():
     context = MagicMock()
     context.function_name = "test-function"
     context.memory_limit_in_mb = 128
-    context.invoked_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:test-function"
+    context.invoked_function_arn = "arn:aws:lambda:sa-east-1:123456789012:function:test-function"
     context.aws_request_id = "test-request-id"
     return context
 

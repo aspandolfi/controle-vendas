@@ -77,7 +77,7 @@ aws configure
 
 ```bash
 # Criar bucket S3 para state (execute uma vez)
-aws s3 mb s3://your-terraform-state-bucket --region us-east-1
+aws s3 mb s3://your-terraform-state-bucket --region sa-east-1
 aws s3api put-bucket-versioning --bucket your-terraform-state-bucket --versioning-configuration Status=Enabled
 
 # Criar tabela DynamoDB para lock (execute uma vez)
@@ -86,7 +86,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
+  --region sa-east-1
 ```
 
 ### 3. Configurar Ambientes
@@ -176,7 +176,7 @@ terraform apply -target=aws_lambda_function.api
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
 | `environment` | Ambiente (dev/staging/prod) | - |
-| `aws_region` | Região AWS | us-east-1 |
+| `aws_region` | Região AWS | sa-east-1 |
 | `lambda_memory_size` | Memória Lambda (MB) | 512 |
 | `lambda_timeout` | Timeout Lambda (s) | 30 |
 | `dynamodb_billing_mode` | Modo de billing DynamoDB | PAY_PER_REQUEST |
@@ -194,7 +194,7 @@ Após o deploy, Terraform retorna:
 Exemplo:
 ```bash
 terraform output api_gateway_url
-# https://abc123.execute-api.us-east-1.amazonaws.com/dev
+# https://abc123.execute-api.sa-east-1.amazonaws.com/dev
 ```
 
 ## 🌍 Múltiplos Ambientes
@@ -249,7 +249,7 @@ Veja `environments/README.md` para mais detalhes.
 - ⚠️ Secrets devem usar AWS Secrets Manager (não incluído)
 - ⚠️ API Gateway sem autenticação (adicionar Cognito/Lambda authorizer)
 
-## 💰 Custos Estimados (AWS us-east-1)
+## 💰 Custos Estimados (AWS sa-east-1)
 
 **Dev/Staging (baixo uso):**
 - DynamoDB (PAY_PER_REQUEST): ~$1-5/mês

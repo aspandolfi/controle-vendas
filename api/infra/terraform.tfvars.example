@@ -1,6 +1,6 @@
 # Development Environment
 environment = "dev"
-aws_region  = "us-east-1"
+aws_region  = "sa-east-1"
 
 # Lambda Configuration
 lambda_memory_size  = 512

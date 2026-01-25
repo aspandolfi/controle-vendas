@@ -96,7 +96,7 @@ Consulte a documentação em `../docs/dynamodb-single-table-design.md` para deta
 ## 🔐 Variáveis de Ambiente
 
 - `DYNAMODB_TABLE_NAME`: Nome da tabela DynamoDB
-- `AWS_REGION`: Região AWS (padrão: us-east-1)
+- `AWS_REGION`: Região AWS (padrão: sa-east-1)
 - `LOG_LEVEL`: Nível de log (INFO, DEBUG, ERROR)
 - `POWERTOOLS_SERVICE_NAME`: Nome do serviço para logs
 

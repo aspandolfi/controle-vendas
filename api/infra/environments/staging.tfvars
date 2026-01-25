@@ -1,7 +1,7 @@
 # Staging Environment Configuration
 
 environment = "staging"
-aws_region  = "us-east-1"
+aws_region  = "sa-east-1"
 
 # Project
 project_name = "controle-vendas"
