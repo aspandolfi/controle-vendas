@@ -432,16 +432,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
-
       - name: Build Lambda deployment package
         working-directory: ./api
         run: |
           chmod +x scripts/build.sh
           ./scripts/build.sh
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
 
       - name: Terraform Init
         working-directory: ./api/infra
@@ -521,78 +521,39 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION || 'sa-east-1' }}
 
-      - name: Set bucket name
-        id: bucket-name
-        run: |
-          BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
-          if [ -z "$BUCKET_NAME" ]; then
-            # Generate bucket name if not provided
-            BUCKET_NAME="controle-vendas-web-dev-${{ github.repository_owner }}"
-            BUCKET_NAME=$(echo "$BUCKET_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-          fi
-          echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
-          echo "📦 Bucket name: $BUCKET_NAME"
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
 
-      - name: Create S3 bucket if not exists
+      - name: Terraform Init
+        working-directory: ./web/infra
         run: |
-          BUCKET_NAME="${{ steps.bucket-name.outputs.bucket_name }}"
-          REGION="${{ secrets.AWS_REGION || 'sa-east-1' }}"
-          
-          echo "🔍 Checking if bucket exists: $BUCKET_NAME"
-          
-          if aws s3 ls "s3://$BUCKET_NAME" 2>&1 | grep -q 'NoSuchBucket'; then
-            echo "📦 Bucket does not exist. Creating..."
-            
-            # Create bucket
-            if [ "$REGION" == "us-east-1" ]; then
-              aws s3 mb "s3://$BUCKET_NAME"
-            else
-              aws s3 mb "s3://$BUCKET_NAME" --region "$REGION"
-            fi
-            
-            echo "✅ Bucket created successfully"
-            
-            # Configure bucket for static website hosting
-            echo "🌐 Configuring static website hosting..."
-            aws s3 website "s3://$BUCKET_NAME" \
-              --index-document index.html \
-              --error-document index.html
-            
-            # Set bucket policy for public read access
-            echo "🔓 Setting bucket policy for public read..."
-            cat > /tmp/bucket-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Sid": "PublicReadGetObject",
-                "Effect": "Allow",
-                "Principal": "*",
-                "Action": "s3:GetObject",
-                "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
-              }
-            ]
-          }
-          EOF
-            aws s3api put-bucket-policy \
-              --bucket "$BUCKET_NAME" \
-              --policy file:///tmp/bucket-policy.json
-            
-            # Disable block public access
-            echo "🔓 Disabling block public access..."
-            aws s3api put-public-access-block \
-              --bucket "$BUCKET_NAME" \
-              --public-access-block-configuration \
-              "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-            
-            echo "✅ Bucket configured for static website hosting"
-          else
-            echo "✅ Bucket already exists"
-          fi
+          terraform init -backend-config="backends/dev.tfvars"
+
+      - name: Terraform Plan
+        working-directory: ./web/infra
+        run: |
+          terraform plan -var-file="environments/dev.tfvars" -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./web/infra
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get bucket name from Terraform
+        id: bucket-info
+        working-directory: ./web/infra
+        run: |
+          BUCKET_NAME=$(terraform output -raw bucket_name)
+          WEBSITE_URL=$(terraform output -raw website_url)
+          echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "website_url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          echo "📦 Bucket: $BUCKET_NAME"
+          echo "🌐 Website URL: $WEBSITE_URL"
 
       - name: Deploy to S3
         run: |
-          BUCKET_NAME="${{ steps.bucket-name.outputs.bucket_name }}"
+          BUCKET_NAME="${{ steps.bucket-info.outputs.bucket_name }}"
           
           echo "🚀 Deploying web application to S3..."
           echo "📦 Bucket: $BUCKET_NAME"
@@ -615,37 +576,21 @@ jobs:
           
           echo "✅ Deployment completed successfully"
 
-      - name: Get website URL
-        id: get-url
-        run: |
-          BUCKET_NAME="${{ steps.bucket-name.outputs.bucket_name }}"
-          REGION="${{ secrets.AWS_REGION || 'sa-east-1' }}"
-          
-          # Construct website URL based on region
-          if [ "$REGION" == "us-east-1" ]; then
-            WEBSITE_URL="http://$BUCKET_NAME.s3-website-us-east-1.amazonaws.com"
-          else
-            WEBSITE_URL="http://$BUCKET_NAME.s3-website-$REGION.amazonaws.com"
-          fi
-          
-          echo "website_url=$WEBSITE_URL" >> $GITHUB_OUTPUT
-          echo "🌐 Website URL: $WEBSITE_URL"
-
       - name: Deployment Summary
         if: always()
         run: |
           echo "## 🚀 DEV Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** dev" >> $GITHUB_STEP_SUMMARY
-          echo "- **Bucket:** ${{ steps.bucket-name.outputs.bucket_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bucket:** ${{ steps.bucket-info.outputs.bucket_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ job.status }}" == "success" ]; then
-            echo "- **Website URL:** ${{ steps.get-url.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Website URL:** ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Access your application at: ${{ steps.get-url.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "Access your application at: ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
