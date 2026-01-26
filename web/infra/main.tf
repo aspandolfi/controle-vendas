@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.5.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -9,10 +9,20 @@ terraform {
   }
 
   backend "s3" {
-    # Configuration will be provided via backend-config
+    # Backend configuration will be provided via backend config file
+    # Example: terraform init -backend-config=backends/dev.tfvars
   }
 }
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = "controle-vendas"
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+      Component   = "web"
+    }
+  }
 }

@@ -1,0 +1,107 @@
+name: Renew Let's Encrypt Certificate
+
+on:
+  # Executa automaticamente todo dia 1 e 15 de cada mês
+  schedule:
+    - cron: '0 0 1,15 * *'
+  
+  # Permite execução manual
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to renew certificate'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  renew-certificate:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event.inputs.environment && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev", "staging", "prod"]') }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install certbot certbot-dns-route53 boto3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Check certificate expiration
+        id: check-expiration
+        run: |
+          cd web/scripts
+          CERT_DIR="./certificates/${{ matrix.environment }}"
+          
+          if [ ! -f "$CERT_DIR/certificate-arn.txt" ]; then
+            echo "No certificate found for ${{ matrix.environment }}"
+            echo "needs_renewal=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          CERT_ARN=$(cat "$CERT_DIR/certificate-arn.txt")
+          
+          # Verifica dias até expiração
+          EXPIRY_DATE=$(aws acm describe-certificate \
+            --certificate-arn "$CERT_ARN" \
+            --region us-east-1 \
+            --query 'Certificate.NotAfter' \
+            --output text)
+          
+          EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+          NOW_EPOCH=$(date +%s)
+          DAYS_UNTIL_EXPIRY=$(( ($EXPIRY_EPOCH - $NOW_EPOCH) / 86400 ))
+          
+          echo "Certificate expires in $DAYS_UNTIL_EXPIRY days"
+          
+          # Renova se faltar menos de 30 dias
+          if [ $DAYS_UNTIL_EXPIRY -lt 30 ]; then
+            echo "Certificate needs renewal"
+            echo "needs_renewal=true" >> $GITHUB_OUTPUT
+          else
+            echo "Certificate is still valid"
+            echo "needs_renewal=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Renew certificate
+        if: steps.check-expiration.outputs.needs_renewal == 'true'
+        run: |
+          cd web/scripts
+          
+          # Carrega configurações do ambiente
+          DOMAIN="${{ secrets[format('{0}_DOMAIN_NAME', matrix.environment)] }}"
+          EMAIL="${{ secrets.LETSENCRYPT_EMAIL }}"
+          
+          python3 letsencrypt-route53.py \
+            --domain "$DOMAIN" \
+            --email "$EMAIL" \
+            --environment "${{ matrix.environment }}" \
+            --renew
+      
+      - name: Notify success
+        if: steps.check-expiration.outputs.needs_renewal == 'true'
+        run: |
+          echo "✓ Certificate renewed successfully for ${{ matrix.environment }}"
+      
+      - name: Notify skipped
+        if: steps.check-expiration.outputs.needs_renewal == 'false'
+        run: |
+          echo "Certificate for ${{ matrix.environment }} is still valid, skipping renewal"

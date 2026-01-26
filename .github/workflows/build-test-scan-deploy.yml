@@ -638,10 +638,15 @@ jobs:
         run: |
           BUCKET_NAME=$(terraform output -raw bucket_name)
           WEBSITE_URL=$(terraform output -raw website_url)
+          CLOUDFRONT_URL=$(terraform output -raw cloudfront_url)
+          CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id)
           echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
           echo "website_url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          echo "cloudfront_url=$CLOUDFRONT_URL" >> $GITHUB_OUTPUT
+          echo "cloudfront_id=$CLOUDFRONT_ID" >> $GITHUB_OUTPUT
           echo "📦 Bucket: $BUCKET_NAME"
-          echo "🌐 Website URL: $WEBSITE_URL"
+          echo "🌐 S3 Website URL: $WEBSITE_URL"
+          echo "🚀 CloudFront URL: $CLOUDFRONT_URL"
 
       - name: Deploy to S3
         run: |
@@ -668,6 +673,17 @@ jobs:
           
           echo "✅ Deployment completed successfully"
 
+      - name: Invalidate CloudFront cache
+        run: |
+          CLOUDFRONT_ID="${{ steps.bucket-info.outputs.cloudfront_id }}"
+          
+          echo "🔄 Invalidating CloudFront cache..."
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_ID" \
+            --paths "/*"
+          
+          echo "✅ CloudFront cache invalidated"
+
       - name: Deployment Summary
         if: always()
         run: |
@@ -678,11 +694,14 @@ jobs:
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ job.status }}" == "success" ]; then
-            echo "- **Website URL:** ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **S3 Website URL:** ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **CloudFront URL:** ${{ steps.bucket-info.outputs.cloudfront_url }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Access your application at: ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "🌐 Access your application at: **${{ steps.bucket-info.outputs.cloudfront_url }}**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Direct S3 access (for testing): ${{ steps.bucket-info.outputs.website_url }}" >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY

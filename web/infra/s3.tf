@@ -37,35 +37,17 @@ resource "aws_s3_bucket_website_configuration" "website" {
   }
 }
 
-# Disable block public access
+# Disable block public access (CloudFront will access via OAI)
 resource "aws_s3_bucket_public_access_block" "website" {
   bucket = aws_s3_bucket.website.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# Bucket policy for public read access
-resource "aws_s3_bucket_policy" "website" {
-  bucket = aws_s3_bucket.website.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.website.arn}/*"
-      }
-    ]
-  })
-
-  depends_on = [aws_s3_bucket_public_access_block.website]
-}
+# Bucket policy is now managed in cloudfront.tf
 
 # CORS configuration
 resource "aws_s3_bucket_cors_configuration" "website" {

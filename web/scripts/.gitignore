@@ -1,0 +1,6 @@
+# Certificados Let's Encrypt (contém chaves privadas)
+certificates/
+
+# Arquivos temporários
+*.tmp
+*.log
