@@ -106,9 +106,9 @@ resource "aws_cloudfront_distribution" "website" {
 
   # Aguarda validação do certificado ACM (se estiver sendo criado)
   # Para certificados Let's Encrypt importados, não há dependência
-  depends_on = var.use_acm_certificate ? [
+  depends_on = [
     aws_acm_certificate_validation.website
-  ] : []
+  ]
 }
 
 # Update S3 bucket policy to allow CloudFront access
