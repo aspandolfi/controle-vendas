@@ -78,11 +78,17 @@ htmlcov/
 .env
 .env.local
 
+# Docker
+docker-compose.override.yml
+.dockerignore.local
+
 # Terraform
 *.tfvars
 !*.tfvars.example
 !api/infra/backends/*.tfvars
 !api/infra/environments/*.tfvars
+!web/infra/backends/*.tfvars
+!web/infra/environments/*.tfvars
 .terraform/
 .terraform.lock.hcl
 *.tfstate

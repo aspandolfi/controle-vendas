@@ -1,6 +1,7 @@
 """
 DynamoDB repository for sales control data
 """
+import os
 from typing import Any, Dict, List, Optional
 import boto3
 from botocore.exceptions import ClientError
@@ -19,7 +20,15 @@ class DynamoDBRepository:
         Args:
             table_name: DynamoDB table name
         """
-        self.dynamodb = boto3.resource('dynamodb')
+        # Support local DynamoDB endpoint for development
+        endpoint_url = os.environ.get('DYNAMODB_ENDPOINT')
+        
+        if endpoint_url:
+            logger.info(f"Using DynamoDB endpoint: {endpoint_url}")
+            self.dynamodb = boto3.resource('dynamodb', endpoint_url=endpoint_url)
+        else:
+            self.dynamodb = boto3.resource('dynamodb')
+            
         self.table = self.dynamodb.Table(table_name)
         self.table_name = table_name
     

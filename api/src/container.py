@@ -108,8 +108,8 @@ def _configure_container(container: Container) -> None:
     Args:
         container: Container to configure
     """
-    # Get table name from environment
-    table_name = os.environ.get('DYNAMODB_TABLE_NAME', 'controle-vendas')
+    # Get table name from environment (support both variables)
+    table_name = os.environ.get('TABLE_NAME') or os.environ.get('DYNAMODB_TABLE_NAME', 'controle-vendas')
     
     # Register repository
     container.register(
