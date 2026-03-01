@@ -8,7 +8,7 @@ data "aws_route53_zone" "main" {
   private_zone = false
 }
 
-# A record for CloudFront distribution
+# A record for S3 website endpoint
 resource "aws_route53_record" "website" {
   count = var.domain_name != "" ? 1 : 0
 
@@ -17,23 +17,8 @@ resource "aws_route53_record" "website" {
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.website.domain_name
-    zone_id                = aws_cloudfront_distribution.website.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-# AAAA record for IPv6
-resource "aws_route53_record" "website_ipv6" {
-  count = var.domain_name != "" ? 1 : 0
-
-  zone_id = data.aws_route53_zone.main[0].zone_id
-  name    = var.environment == "prod" ? var.domain_name : "${var.environment}.${var.domain_name}"
-  type    = "AAAA"
-
-  alias {
-    name                   = aws_cloudfront_distribution.website.domain_name
-    zone_id                = aws_cloudfront_distribution.website.hosted_zone_id
+    name                   = aws_s3_bucket_website_configuration.website.website_domain
+    zone_id                = aws_s3_bucket.website.hosted_zone_id
     evaluate_target_health = false
   }
 }

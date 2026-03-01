@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { Customer } from '../shared/customer.model';
-import { Sale } from '../shared/sale.model';
+import { Sale, PaymentMethod } from '../shared/sale.model';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { SalesDataService } from '../shared/services/sales.data.service';
 import { DatePipe, DecimalPipe, CommonModule } from '@angular/common';
+import { Pagination } from '../shared/components/pagination/pagination';
 
 @Component({
   selector: 'app-credit-sales',
-  imports: [DecimalPipe, ReactiveFormsModule, DatePipe, CommonModule, FormsModule],
+  imports: [DecimalPipe, ReactiveFormsModule, DatePipe, CommonModule, FormsModule, Pagination],
   templateUrl: './credit-sales.html',
   styleUrl: './credit-sales.less',
 })
@@ -18,6 +19,10 @@ export class CreditSales implements OnInit {
   saleForm!: FormGroup;
   searchText: string = '';
   filteredCustomers: Customer[] = [];
+  showModal = false;
+  currentPageSearch = 1;
+  currentPageSales = 1;
+  itemsPerPage = 10;
 
   constructor(
     private dataService: SalesDataService,
@@ -33,7 +38,8 @@ export class CreditSales implements OnInit {
     this.saleForm = this.fb.group({
       description: ['', Validators.required],
       date: [new Date().toISOString().substring(0, 10), Validators.required],
-      totalAmount: [0, [Validators.required, Validators.min(0.01)]]
+      totalAmount: [0, [Validators.required, Validators.min(0.01)]],
+      paymentMethod: ['DINHEIRO', Validators.required]
     });
   }
 
@@ -50,6 +56,26 @@ export class CreditSales implements OnInit {
   selectCustomer(customerId: number): void {
     this.selectedCustomerId = customerId;
     this.salesForCustomer = this.dataService.getSalesByCustomer(customerId);
+  }
+
+  selectCustomerAndOpenModal(customerId: number): void {
+    this.selectCustomer(customerId);
+    this.showModal = true;
+  }
+
+  openModal(): void {
+    if (!this.selectedCustomerId) return;
+    this.showModal = true;
+  }
+
+  closeModal(): void {
+    this.showModal = false;
+    this.saleForm.reset({
+      description: '',
+      date: new Date().toISOString().substring(0, 10),
+      totalAmount: 0,
+      paymentMethod: 'DINHEIRO'
+    });
   }
 
   getCustomerName(customerId: number): string {
@@ -81,18 +107,60 @@ export class CreditSales implements OnInit {
       type: 'PRAZO',
       description: value.description,
       date: value.date,
-      totalAmount: value.totalAmount
+      totalAmount: value.totalAmount,
+      paymentMethod: value.paymentMethod
     });
 
     this.saleForm.reset({
       description: '',
       date: new Date().toISOString().substring(0, 10),
-      totalAmount: 0
+      totalAmount: 0,
+      paymentMethod: 'DINHEIRO'
     });
     this.selectCustomer(this.selectedCustomerId);
+    this.closeModal();
   }
   
   getCustomerOpenBalance(customerId: number): number {
     return this.dataService.getCustomerOpenBalance(customerId);
+  }
+
+  getPaymentMethodLabel(method?: PaymentMethod): string {
+    const labels: Record<PaymentMethod, string> = {
+      DINHEIRO: 'Dinheiro',
+      PIX: 'Pix',
+      CARTAO_CREDITO: 'Cartão de Crédito',
+      CARTAO_CREDITO_PARCELADO: 'Cartão de Crédito Parcelado',
+      CARTAO_DEBITO: 'Cartão de Débito'
+    };
+    return method ? labels[method] : '-';
+  }
+
+  get paginatedFilteredCustomers(): Customer[] {
+    const startIndex = (this.currentPageSearch - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.filteredCustomers.slice(startIndex, endIndex);
+  }
+
+  get totalPagesSearch(): number {
+    return Math.ceil(this.filteredCustomers.length / this.itemsPerPage);
+  }
+
+  onPageChangeSearch(page: number): void {
+    this.currentPageSearch = page;
+  }
+
+  get paginatedSalesForCustomer(): Sale[] {
+    const startIndex = (this.currentPageSales - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.salesForCustomer.slice(startIndex, endIndex);
+  }
+
+  get totalPagesSales(): number {
+    return Math.ceil(this.salesForCustomer.length / this.itemsPerPage);
+  }
+
+  onPageChangeSales(page: number): void {
+    this.currentPageSales = page;
   }
 }

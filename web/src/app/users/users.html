@@ -23,7 +23,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let user of users">
+            <tr *ngFor="let user of paginatedUsers">
               <td>{{ user.id }}</td>
               <td>{{ user.name }}</td>
               <td>{{ user.username }}</td>
@@ -76,6 +76,13 @@
           </tbody>
         </table>
       </div>
+
+      <app-pagination 
+        [currentPage]="currentPage" 
+        [totalPages]="totalPages"
+        (pageChange)="onPageChange($event)"
+      ></app-pagination>
+
     </div>
   </div>
 

@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { User } from '../shared/user.model';
 import { UserService } from '../shared/services/user.service';
+import { Pagination } from '../shared/components/pagination/pagination';
 
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, Pagination],
   templateUrl: './users.html',
   styleUrl: './users.less'
 })
@@ -17,6 +18,8 @@ export class Users implements OnInit {
   showModal = false;
   editingUser: User | null = null;
   errorMessage = '';
+  currentPage = 1;
+  itemsPerPage = 10;
 
   constructor(
     private fb: FormBuilder,
@@ -160,5 +163,19 @@ export class Users implements OnInit {
 
     this.userService.updateUser(updatedUser);
     this.loadUsers();
+  }
+
+  get paginatedUsers(): User[] {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.users.slice(startIndex, endIndex);
+  }
+
+  get totalPages(): number {
+    return Math.ceil(this.users.length / this.itemsPerPage);
+  }
+
+  onPageChange(page: number): void {
+    this.currentPage = page;
   }
 }

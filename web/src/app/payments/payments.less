@@ -17,3 +17,39 @@
     opacity: 0.5;
   }
 }
+
+// Container de impressão - oculto na tela, visível na impressão
+.print-only {
+  display: none;
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+
+  @media print {
+    display: block;
+    position: static;
+    top: auto;
+    left: auto;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+// Ocultar todo o conteúdo normal durante a impressão
+@media print {
+  section > *:not(.print-only) {
+    display: none !important;
+  }
+  
+  section {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  
+  html, body {
+    height: auto;
+    overflow: hidden;
+  }
+}

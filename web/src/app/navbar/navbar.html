@@ -6,16 +6,15 @@
     <button
       class="navbar-toggler"
       type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#mainNavbar"
+      (click)="toggleMenu()"
+      [attr.aria-expanded]="!isCollapsed"
       aria-controls="mainNavbar"
-      aria-expanded="false"
       aria-label="Toggle navigation"
     >
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <div class="collapse navbar-collapse" id="mainNavbar">
+    <div class="collapse navbar-collapse" id="mainNavbar" [class.show]="!isCollapsed">
       <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
         <li class="nav-item">
           <a
@@ -23,32 +22,33 @@
             routerLink="/"
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: true }"
+            (click)="closeMenu()"
           >
             Dashboard
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/clientes" routerLinkActive="active">
+          <a class="nav-link" routerLink="/clientes" routerLinkActive="active" (click)="closeMenu()">
             Clientes
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/vendas-prazo" routerLinkActive="active">
+          <a class="nav-link" routerLink="/vendas-prazo" routerLinkActive="active" (click)="closeMenu()">
             Vendas a Prazo
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/vendas-avulso" routerLinkActive="active">
+          <a class="nav-link" routerLink="/vendas-avulso" routerLinkActive="active" (click)="closeMenu()">
             Vendas Avulso
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/pagamentos" routerLinkActive="active">
+          <a class="nav-link" routerLink="/pagamentos" routerLinkActive="active" (click)="closeMenu()">
             Pagamentos
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" routerLink="/usuarios" routerLinkActive="active">
+          <a class="nav-link" routerLink="/usuarios" routerLinkActive="active" (click)="closeMenu()">
             Usuários
           </a>
         </li>

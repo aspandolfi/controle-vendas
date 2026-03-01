@@ -6,15 +6,71 @@
     </button>
   </div>
 
-  <div class="row g-3">
-    <!-- Formulário -->
-    <div class="col-lg-5">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">
+  <!-- Lista em tela cheia -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Lista de clientes</h5>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>Endereço</th>
+              <th>Saldo em aberto</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of paginatedCustomers">
+              <td>{{ c.name }}</td>
+              <td>{{ c.phone }}</td>
+              <td>{{ c.address }}</td>
+              <td>
+                R$
+                {{ getCustomerBalance(c.id) | number: '1.2-2' }}
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-link btn-sm"
+                  (click)="edit(c)"
+                >
+                  Editar
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="customers.length === 0">
+              <td colspan="5" class="text-center text-muted">
+                Nenhum cliente cadastrado.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination 
+        [currentPage]="currentPage" 
+        [totalPages]="totalPages"
+        (pageChange)="onPageChange($event)"
+      ></app-pagination>
+
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" [class.show]="showModal" [style.display]="showModal ? 'block' : 'none'" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
             {{ editingCustomer ? 'Editar Cliente' : 'Novo Cliente' }}
           </h5>
-          <form [formGroup]="customerForm" (ngSubmit)="save()">
+          <button type="button" class="btn-close" (click)="closeModal()" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form [formGroup]="customerForm" (ngSubmit)="save()" id="customerForm">
             <div class="mb-3">
               <label class="form-label">Nome</label>
               <input
@@ -93,63 +149,18 @@
             >
               + Adicionar autorizado
             </button>
-
-            <div class="d-grid">
-              <button type="submit" class="btn btn-primary">
-                {{ editingCustomer ? 'Salvar alterações' : 'Cadastrar' }}
-              </button>
-            </div>
           </form>
         </div>
-      </div>
-    </div>
-
-    <!-- Lista -->
-    <div class="col-lg-7">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Lista de clientes</h5>
-
-          <div class="table-responsive">
-            <table class="table table-hover align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Nome</th>
-                  <th>Telefone</th>
-                  <th>Endereço</th>
-                  <th>Saldo em aberto</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let c of customers">
-                  <td>{{ c.name }}</td>
-                  <td>{{ c.phone }}</td>
-                  <td>{{ c.address }}</td>
-                  <td>
-                    R$
-                    {{ getCustomerBalance(c.id) | number: '1.2-2' }}
-                  </td>
-                  <td class="text-end">
-                    <button
-                      type="button"
-                      class="btn btn-link btn-sm"
-                      (click)="edit(c)"
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="customers.length === 0">
-                  <td colspan="5" class="text-center text-muted">
-                    Nenhum cliente cadastrado.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">
+            Cancelar
+          </button>
+          <button type="submit" form="customerForm" class="btn btn-primary">
+            {{ editingCustomer ? 'Salvar alterações' : 'Cadastrar' }}
+          </button>
         </div>
       </div>
     </div>
   </div>
+  <div class="modal-backdrop fade" [class.show]="showModal" *ngIf="showModal"></div>
 </section>

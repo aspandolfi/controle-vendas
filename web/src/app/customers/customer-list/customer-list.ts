@@ -1,4 +1,3 @@
-// src/app/pages/customers/customer-list/customer-list.component.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -10,17 +9,21 @@ import {
 } from '@angular/forms';
 import { Customer } from '../../shared/customer.model';
 import { SalesDataService } from '../../shared/services/sales.data.service';
+import { Pagination } from '../../shared/components/pagination/pagination';
 
 @Component({
   selector: 'app-customer-list',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, Pagination],
   templateUrl: './customer-list.html'
 })
 export class CustomerList implements OnInit {
   customers: Customer[] = [];
   customerForm!: FormGroup;
   editingCustomer: Customer | null = null;
+  showModal = false;
+  currentPage = 1;
+  itemsPerPage = 10;
 
   constructor(
     private fb: FormBuilder,
@@ -74,11 +77,19 @@ export class CustomerList implements OnInit {
   startNew(): void {
     this.editingCustomer = null;
     this.buildForm();
+    this.showModal = true;
   }
 
   edit(customer: Customer): void {
     this.editingCustomer = customer;
     this.buildForm(customer);
+    this.showModal = true;
+  }
+
+  closeModal(): void {
+    this.showModal = false;
+    this.editingCustomer = null;
+    this.buildForm();
   }
 
   save(): void {
@@ -105,10 +116,24 @@ export class CustomerList implements OnInit {
     }
 
     this.loadCustomers();
-    this.startNew();
+    this.closeModal();
   }
 
   getCustomerBalance(customerId: number): number {
     return this.dataService.getCustomerOpenBalance(customerId);
+  }
+
+  get paginatedCustomers(): Customer[] {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.customers.slice(startIndex, endIndex);
+  }
+
+  get totalPages(): number {
+    return Math.ceil(this.customers.length / this.itemsPerPage);
+  }
+
+  onPageChange(page: number): void {
+    this.currentPage = page;
   }
 }

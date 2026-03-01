@@ -18,22 +18,12 @@ output "website_url" {
   value       = "http://${aws_s3_bucket_website_configuration.website.website_endpoint}"
 }
 
-output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID"
-  value       = aws_cloudfront_distribution.website.id
-}
-
-output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name"
-  value       = aws_cloudfront_distribution.website.domain_name
-}
-
-output "cloudfront_url" {
-  description = "Full CloudFront URL"
-  value       = "https://${aws_cloudfront_distribution.website.domain_name}"
+output "website_domain" {
+  description = "S3 website domain"
+  value       = aws_s3_bucket_website_configuration.website.website_domain
 }
 
 output "custom_domain_url" {
   description = "Custom domain URL (if domain_name is configured)"
-  value       = var.domain_name != "" ? "https://${var.environment == "prod" ? var.domain_name : "${var.environment}.${var.domain_name}"}" : null
+  value       = var.domain_name != "" ? "http://${var.environment == "prod" ? var.domain_name : "${var.environment}.${var.domain_name}"}" : null
 }

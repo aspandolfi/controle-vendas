@@ -1,5 +1,4 @@
-// src/app/pages/payments/payments.component.ts
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -13,12 +12,15 @@ import { Sale } from '../shared/sale.model';
 import { Payment, PaymentByCustomer } from '../shared/payment.model';
 import { SalesDataService } from '../shared/services/sales.data.service';
 import { UserService } from '../shared/services/user.service';
+import { Pagination } from '../shared/components/pagination/pagination';
+import { PaymentPrintComponent, PaymentPrintData } from './payment-print.component';
 
 @Component({
   selector: 'app-payments',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
-  templateUrl: './payments.html'
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, Pagination, PaymentPrintComponent],
+  templateUrl: './payments.html',
+  styleUrls: ['./payments.less']
 })
 export class Payments implements OnInit {
   customers: Customer[] = [];
@@ -37,10 +39,16 @@ export class Payments implements OnInit {
   showModal = false;
   showPinModal = false;
   pinErrorMessage = '';
+  currentPageSearch = 1;
+  currentPagePayments = 1;
+  itemsPerPage = 10;
 
   // Filtros de data
   startDate: string = '';
   endDate: string = '';
+
+  // Dados de impressão
+  printData: PaymentPrintData | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -111,6 +119,35 @@ export class Payments implements OnInit {
       date: new Date().toISOString().substring(0, 10),
       amount: 0
     });
+  }
+
+  printPayment(): void {
+    if (!this.selectedCustomerId) return;
+
+    const customerName = this.getCustomerName(this.selectedCustomerId);
+    const openBalance = this.getCustomerOpenBalance(this.selectedCustomerId);
+    const date = this.paymentForm.value.date || new Date().toISOString().substring(0, 10);
+
+    this.printData = {
+      customerName,
+      date,
+      openBalance,
+      sales: this.salesForCustomer.map(s => ({
+        date: s.date,
+        description: s.description,
+        remainingBalance: s.remainingBalance
+      }))
+    };
+
+    // Aguardar renderização do componente de impressão
+    setTimeout(() => {
+      window.print();
+      
+      // Limpar dados após impressão
+      setTimeout(() => {
+        this.printData = null;
+      }, 100);
+    }, 100);
   }
 
   getCustomerName(customerId: number): string {
@@ -250,5 +287,33 @@ export class Payments implements OnInit {
 
   getCustomerOpenBalance(customerId: number): number {
     return this.dataService.getCustomerOpenBalance(customerId);
+  }
+
+  get paginatedFilteredCustomers(): Customer[] {
+    const startIndex = (this.currentPageSearch - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.filteredCustomers.slice(startIndex, endIndex);
+  }
+
+  get totalPagesSearch(): number {
+    return Math.ceil(this.filteredCustomers.length / this.itemsPerPage);
+  }
+
+  onPageChangeSearch(page: number): void {
+    this.currentPageSearch = page;
+  }
+
+  get paginatedPayments(): PaymentByCustomer[] {
+    const startIndex = (this.currentPagePayments - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.filteredPaymentByCustomer.slice(startIndex, endIndex);
+  }
+
+  get totalPagesPayments(): number {
+    return Math.ceil(this.filteredPaymentByCustomer.length / this.itemsPerPage);
+  }
+
+  onPageChangePayments(page: number): void {
+    this.currentPagePayments = page;
   }
 }

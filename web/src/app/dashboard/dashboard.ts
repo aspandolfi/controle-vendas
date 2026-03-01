@@ -163,6 +163,13 @@ export class Dashboard implements OnInit, AfterViewInit {
           legend: {
             display: true,
             position: 'top',
+            labels: {
+              boxWidth: 12,
+              padding: 10,
+              font: {
+                size: 11
+              }
+            }
           },
           tooltip: {
             callbacks: {
