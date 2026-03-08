@@ -18,21 +18,35 @@ os.environ["AWS_DEFAULT_REGION"] = "sa-east-1"
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Mock aws_xray_sdk before imports
+# Only mock aws_xray_sdk (not boto3 - integration tests need real boto3)
 mock_xray_recorder = MagicMock()
 mock_core = MagicMock()
 mock_core.xray_recorder = mock_xray_recorder
 sys.modules['aws_xray_sdk'] = MagicMock()
 sys.modules['aws_xray_sdk.core'] = mock_core
 
-# Mock boto3 before any imports
-mock_table = MagicMock()
-mock_dynamodb = MagicMock()
-mock_dynamodb.Table.return_value = mock_table
 
-mock_boto3 = MagicMock()
-mock_boto3.resource.return_value = mock_dynamodb
-sys.modules['boto3'] = mock_boto3
+@pytest.fixture(autouse=False)
+def mock_boto3():
+    """Mock boto3 for unit tests - use this fixture in unit tests"""
+    mock_table = MagicMock()
+    mock_dynamodb = MagicMock()
+    mock_dynamodb.Table.return_value = mock_table
+    
+    mock_boto3_module = MagicMock()
+    mock_boto3_module.resource.return_value = mock_dynamodb
+    
+    # Temporarily replace boto3 in sys.modules
+    original_boto3 = sys.modules.get('boto3')
+    sys.modules['boto3'] = mock_boto3_module
+    
+    yield mock_boto3_module
+    
+    # Restore original boto3
+    if original_boto3:
+        sys.modules['boto3'] = original_boto3
+    else:
+        del sys.modules['boto3']
 
 
 @pytest.fixture

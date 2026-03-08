@@ -11,6 +11,11 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+markers = [
+    "unit: Unit tests (mocked dependencies)",
+    "integration: Integration tests (require LocalStack/external services)",
+    "slow: Slow running tests",
+]
 
 [tool.coverage.run]
 source = ["src"]
