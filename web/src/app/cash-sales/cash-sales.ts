@@ -7,7 +7,7 @@ import {
   Validators
 } from '@angular/forms';
 import { Sale, PaymentMethod } from '../shared/sale.model';
-import { SalesDataService } from '../shared/services/sales.data.service';
+import { SaleService } from '../shared/services/sale.service';
 import { Pagination } from '../shared/components/pagination/pagination';
 
 @Component({
@@ -24,7 +24,7 @@ export class CashSales implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private dataService: SalesDataService
+    private saleService: SaleService
   ) { }
 
   ngOnInit(): void {
@@ -42,7 +42,14 @@ export class CashSales implements OnInit {
   }
 
   loadSales(): void {
-    this.sales = this.dataService.getSales().filter(s => s.type === 'AVULSO');
+    this.saleService.getSales().subscribe({
+      next: (sales) => {
+        this.sales = sales.filter(s => s.type === 'AVULSO');
+      },
+      error: (error) => {
+        console.error('Erro ao carregar vendas:', error);
+      }
+    });
   }
 
   saveSale(): void {
@@ -52,21 +59,26 @@ export class CashSales implements OnInit {
     }
 
     const value = this.saleForm.value;
-    this.dataService.addSale({
+    this.saleService.addSale({
       type: 'AVULSO',
       description: value.description,
       date: value.date,
       totalAmount: value.totalAmount,
       paymentMethod: value.paymentMethod
+    }).subscribe({
+      next: () => {
+        this.saleForm.reset({
+          description: '',
+          date: new Date().toISOString().substring(0, 10),
+          totalAmount: 0,
+          paymentMethod: 'DINHEIRO'
+        });
+        this.loadSales();
+      },
+      error: (error) => {
+        console.error('Erro ao salvar venda:', error);
+      }
     });
-
-    this.saleForm.reset({
-      description: '',
-      date: new Date().toISOString().substring(0, 10),
-      totalAmount: 0,
-      paymentMethod: 'DINHEIRO'
-    });
-    this.loadSales();
   }
 
   getPaymentMethodLabel(method?: PaymentMethod): string {

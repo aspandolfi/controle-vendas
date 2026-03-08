@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { Customer } from '../shared/customer.model';
 import { Sale, PaymentMethod } from '../shared/sale.model';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { SalesDataService } from '../shared/services/sales.data.service';
+import { CustomerService } from '../shared/services/customer.service';
+import { SaleService } from '../shared/services/sale.service';
 import { DatePipe, DecimalPipe, CommonModule } from '@angular/common';
 import { Pagination } from '../shared/components/pagination/pagination';
 
@@ -23,15 +24,42 @@ export class CreditSales implements OnInit {
   currentPageSearch = 1;
   currentPageSales = 1;
   itemsPerPage = 10;
+  customerBalances: Map<number, number> = new Map();
 
   constructor(
-    private dataService: SalesDataService,
+    private customerService: CustomerService,
+    private saleService: SaleService,
     private fb: FormBuilder
   ) { }
 
   ngOnInit(): void {
-    this.customers = this.dataService.getCustomers();
+    this.loadCustomers();
     this.buildForm();
+  }
+
+  loadCustomers(): void {
+    this.customerService.getCustomers().subscribe({
+      next: (customers) => {
+        this.customers = customers;
+        this.loadCustomerBalances();
+      },
+      error: (error) => {
+        console.error('Erro ao carregar clientes:', error);
+      }
+    });
+  }
+
+  loadCustomerBalances(): void {
+    this.customers.forEach(customer => {
+      this.saleService.getCustomerOpenBalance(customer.id).subscribe({
+        next: (balance) => {
+          this.customerBalances.set(customer.id, balance);
+        },
+        error: (error) => {
+          console.error(`Erro ao carregar saldo do cliente ${customer.id}:`, error);
+        }
+      });
+    });
   }
 
   buildForm(): void {
@@ -55,7 +83,14 @@ export class CreditSales implements OnInit {
 
   selectCustomer(customerId: number): void {
     this.selectedCustomerId = customerId;
-    this.salesForCustomer = this.dataService.getSalesByCustomer(customerId);
+    this.saleService.getSalesByCustomer(customerId).subscribe({
+      next: (sales) => {
+        this.salesForCustomer = sales;
+      },
+      error: (error) => {
+        console.error('Erro ao carregar vendas do cliente:', error);
+      }
+    });
   }
 
   selectCustomerAndOpenModal(customerId: number): void {
@@ -86,7 +121,14 @@ export class CreditSales implements OnInit {
   onCustomerChange($event: any): void {
     this.selectedCustomerId = $event;
     if (this.selectedCustomerId) {
-      this.salesForCustomer = this.dataService.getSalesByCustomer(this.selectedCustomerId);
+      this.saleService.getSalesByCustomer(this.selectedCustomerId).subscribe({
+        next: (sales) => {
+          this.salesForCustomer = sales;
+        },
+        error: (error) => {
+          console.error('Erro ao carregar vendas do cliente:', error);
+        }
+      });
     } else {
       this.salesForCustomer = [];
     }
@@ -102,27 +144,34 @@ export class CreditSales implements OnInit {
     }
 
     const value = this.saleForm.value;
-    this.dataService.addSale({
+    this.saleService.addSale({
       customerId: this.selectedCustomerId,
       type: 'PRAZO',
       description: value.description,
       date: value.date,
       totalAmount: value.totalAmount,
       paymentMethod: value.paymentMethod
+    }).subscribe({
+      next: () => {
+        this.saleForm.reset({
+          description: '',
+          date: new Date().toISOString().substring(0, 10),
+          totalAmount: 0,
+          paymentMethod: 'DINHEIRO'
+        });
+        if (this.selectedCustomerId) {
+          this.selectCustomer(this.selectedCustomerId);
+        }
+        this.closeModal();
+      },
+      error: (error) => {
+        console.error('Erro ao salvar venda:', error);
+      }
     });
-
-    this.saleForm.reset({
-      description: '',
-      date: new Date().toISOString().substring(0, 10),
-      totalAmount: 0,
-      paymentMethod: 'DINHEIRO'
-    });
-    this.selectCustomer(this.selectedCustomerId);
-    this.closeModal();
   }
   
   getCustomerOpenBalance(customerId: number): number {
-    return this.dataService.getCustomerOpenBalance(customerId);
+    return this.customerBalances.get(customerId) || 0;
   }
 
   getPaymentMethodLabel(method?: PaymentMethod): string {

@@ -8,7 +8,8 @@ import {
   Validators
 } from '@angular/forms';
 import { Customer } from '../../shared/customer.model';
-import { SalesDataService } from '../../shared/services/sales.data.service';
+import { CustomerService } from '../../shared/services/customer.service';
+import { SaleService } from '../../shared/services/sale.service';
 import { Pagination } from '../../shared/components/pagination/pagination';
 
 @Component({
@@ -24,10 +25,12 @@ export class CustomerList implements OnInit {
   showModal = false;
   currentPage = 1;
   itemsPerPage = 10;
+  customerBalances: Map<number, number> = new Map();
 
   constructor(
     private fb: FormBuilder,
-    private dataService: SalesDataService
+    private customerService: CustomerService,
+    private saleService: SaleService
   ) { }
 
   ngOnInit(): void {
@@ -36,7 +39,29 @@ export class CustomerList implements OnInit {
   }
 
   loadCustomers(): void {
-    this.customers = this.dataService.getCustomers();
+    this.customerService.getCustomers().subscribe({
+      next: (customers) => {
+        this.customers = customers;
+        // Carregar saldos para cada cliente
+        this.loadCustomerBalances();
+      },
+      error: (error) => {
+        console.error('Erro ao carregar clientes:', error);
+      }
+    });
+  }
+
+  loadCustomerBalances(): void {
+    this.customers.forEach(customer => {
+      this.saleService.getCustomerOpenBalance(customer.id).subscribe({
+        next: (balance) => {
+          this.customerBalances.set(customer.id, balance);
+        },
+        error: (error) => {
+          console.error(`Erro ao carregar saldo do cliente ${customer.id}:`, error);
+        }
+      });
+    });
   }
 
   buildForm(customer?: Customer): void {
@@ -105,22 +130,35 @@ export class CustomerList implements OnInit {
         ...this.editingCustomer,
         ...value
       };
-      this.dataService.updateCustomer(updated);
+      this.customerService.updateCustomer(updated).subscribe({
+        next: () => {
+          this.loadCustomers();
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erro ao atualizar cliente:', error);
+        }
+      });
     } else {
-      this.dataService.addCustomer({
+      this.customerService.addCustomer({
         name: value.name,
         phone: value.phone,
         address: value.address,
         authorizedPeople: value.authorizedPeople
+      }).subscribe({
+        next: () => {
+          this.loadCustomers();
+          this.closeModal();
+        },
+        error: (error) => {
+          console.error('Erro ao criar cliente:', error);
+        }
       });
     }
-
-    this.loadCustomers();
-    this.closeModal();
   }
 
   getCustomerBalance(customerId: number): number {
-    return this.dataService.getCustomerOpenBalance(customerId);
+    return this.customerBalances.get(customerId) || 0;
   }
 
   get paginatedCustomers(): Customer[] {

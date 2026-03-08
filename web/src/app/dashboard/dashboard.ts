@@ -4,8 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Customer } from '../shared/customer.model';
 import { Sale } from '../shared/sale.model';
 import { Payment } from '../shared/payment.model';
-import { SalesDataService } from '../shared/services/sales.data.service';
+import { CustomerService } from '../shared/services/customer.service';
+import { SaleService } from '../shared/services/sale.service';
+import { PaymentService } from '../shared/services/payment.service';
 import { Chart, registerables } from 'chart.js';
+import { forkJoin } from 'rxjs';
 
 Chart.register(...registerables);
 
@@ -39,26 +42,50 @@ export class Dashboard implements OnInit, AfterViewInit {
   startDate: string = '';
   endDate: string = '';
 
-  constructor(private dataService: SalesDataService) { }
+  constructor(
+    private customerService: CustomerService,
+    private saleService: SaleService,
+    private paymentService: PaymentService
+  ) { }
 
   ngOnInit(): void {
-    this.customers = this.dataService.getCustomers();
-    this.sales = this.dataService.getSales();
-    this.payments = this.dataService.getPayments();
-    
     // Definir datas padrão (dia atual)
     const today = new Date();
     this.endDate = today.toISOString().split('T')[0];
     this.startDate = today.toISOString().split('T')[0];
     
-    // Calcular saldo em aberto total (não afetado pelo filtro)
-    this.totalOpenBalance = this.sales
-      .filter(s => s.type === 'PRAZO')
-      .reduce((sum, s) => sum + s.remainingBalance, 0);
-    
-    this.updateStatistics();
+    this.loadData();
   }
 
+  loadData(): void {
+    forkJoin({
+      customers: this.customerService.getCustomers(),
+      sales: this.saleService.getSales(),
+      payments: this.paymentService.getPayments()
+    }).subscribe({
+      next: (data) => {
+        this.customers = data.customers;
+        this.sales = data.sales;
+        this.payments = data.payments;
+        
+        // Calcular saldo em aberto total (não afetado pelo filtro)
+        this.totalOpenBalance = this.sales
+          .filter(s => s.type === 'PRAZO')
+          .reduce((sum, s) => sum + s.remainingBalance, 0);
+        
+        this.updateStatistics();
+        
+        // Criar gráfico após carregar dados
+        if (this.salesChartRef) {
+          this.createChart();
+        }
+      },
+      error: (error) => {
+        console.error('Erro ao carregar dados:', error);
+      }
+    });
+  }
+// O gráfico será criado após o carregamento dos dados em loadData()
   private updateStatistics(): void {
     // Filtrar vendas por data
     const filteredSales = this.sales.filter(sale => {

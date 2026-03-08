@@ -10,7 +10,9 @@ import { FormsModule } from '@angular/forms';
 import { Customer } from '../shared/customer.model';
 import { Sale } from '../shared/sale.model';
 import { Payment, PaymentByCustomer } from '../shared/payment.model';
-import { SalesDataService } from '../shared/services/sales.data.service';
+import { CustomerService } from '../shared/services/customer.service';
+import { SaleService } from '../shared/services/sale.service';
+import { PaymentService } from '../shared/services/payment.service';
 import { UserService } from '../shared/services/user.service';
 import { Pagination } from '../shared/components/pagination/pagination';
 import { PaymentPrintComponent, PaymentPrintData } from './payment-print.component';
@@ -52,23 +54,13 @@ export class Payments implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private dataService: SalesDataService,
+    private customerService: CustomerService,
+    private saleService: SaleService,
+    private paymentService: PaymentService,
     private userService: UserService
   ) { }
 
   ngOnInit(): void {
-    this.customers = this.dataService.getCustomers();
-    this.payments = this.dataService.getPayments();
-    this.paymentByCustomer = this.payments.map(p => ({
-      id: p.id,
-      customerName: this.customers.find(c => c.id === p.customerId)?.name || '',
-      customerId: p.customerId,
-      saleId: p.saleId,
-      amount: p.amount,
-      date: p.date,
-      sale: p.saleId ? this.getSaleById(p.saleId) : undefined,
-    }));
-    
     // Definir datas padrão (últimos 30 dias)
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
@@ -77,8 +69,36 @@ export class Payments implements OnInit {
     this.endDate = today.toISOString().split('T')[0];
     this.startDate = thirtyDaysAgo.toISOString().split('T')[0];
     
-    this.filterPayments();
+    this.loadData();
     this.buildForm();
+  }
+
+  loadData(): void {
+    this.customerService.getCustomers().subscribe({
+      next: (customers) => {
+        this.customers = customers;
+        this.loadPayments();
+      },
+      error: (error) => console.error('Erro ao carregar clientes:', error)
+    });
+  }
+
+  loadPayments(): void {
+    this.paymentService.getPayments().subscribe({
+      next: (payments) => {
+        this.payments = payments;
+        this.paymentByCustomer = this.payments.map(p => ({
+          id: p.id,
+          customerName: this.customers.find(c => c.id === p.customerId)?.name || '',
+          customerId: p.customerId,
+          saleId: p.saleId,
+          amount: p.amount,
+          date: p.date
+        }));
+        this.filterPayments();
+      },
+      error: (error) => console.error('Erro ao carregar pagamentos:', error)
+    });
   }
 
   buildForm(): void {
@@ -157,10 +177,14 @@ export class Payments implements OnInit {
 
   onCustomerChange(): void {
     if (this.selectedCustomerId) {
-      this.salesForCustomer = this.dataService
-        .getSalesByCustomer(this.selectedCustomerId)
-        .filter(s => s.type === 'PRAZO' && s.remainingBalance > 0)
-        .sort((a, b) => a.date.localeCompare(b.date));
+      this.saleService.getSalesByCustomer(this.selectedCustomerId).subscribe({
+        next: (sales) => {
+          this.salesForCustomer = sales
+            .filter(s => s.type === 'PRAZO' && s.remainingBalance > 0)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        },
+        error: (error) => console.error('Erro ao carregar vendas:', error)
+      });
     } else {
       this.salesForCustomer = [];
     }
@@ -194,43 +218,37 @@ export class Payments implements OnInit {
   private processPayment(): void {
     const value = this.paymentForm.value;
 
-    const result = this.dataService.addPayment({
+    this.paymentService.addPayment({
       customerId: this.selectedCustomerId!,
       date: value.date,
       amount: value.amount
+    }).subscribe({
+      next: () => {
+        // Atualizar vendas do cliente
+        this.saleService.getSalesByCustomer(this.selectedCustomerId!).subscribe({
+          next: (sales) => {
+            this.salesForCustomer = sales
+              .filter(s => s.type === 'PRAZO' && s.remainingBalance > 0)
+              .sort((a, b) => a.date.localeCompare(b.date));
+          },
+          error: (error) => console.error('Erro ao carregar vendas:', error)
+        });
+
+        this.loadPayments();
+
+        this.paymentForm.reset({
+          date: new Date().toISOString().substring(0, 10),
+          amount: 0
+        });
+
+        this.errorMessage = '';
+        this.closeModal();
+      },
+      error: (error) => {
+        console.error('Erro ao registrar pagamento:', error);
+        this.errorMessage = 'Erro ao registrar pagamento.';
+      }
     });
-
-    if (!result) {
-      this.errorMessage = 'Erro ao registrar pagamento.';
-      return;
-    }
-
-    // Atualizar vendas do cliente
-    this.salesForCustomer = this.dataService
-      .getSalesByCustomer(this.selectedCustomerId!)
-      .filter(s => s.type === 'PRAZO' && s.remainingBalance > 0)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    this.payments = this.dataService.getPayments();
-    this.paymentByCustomer = this.payments.map(p => ({
-      id: p.id,
-      customerName: this.customers.find(c => c.id === p.customerId)?.name || '',
-      customerId: p.customerId,
-      saleId: p.saleId,
-      amount: p.amount,
-      date: p.date,
-      sale: this.getSaleById(p.saleId!),
-    }));
-    
-    this.filterPayments();
-
-    this.paymentForm.reset({
-      date: new Date().toISOString().substring(0, 10),
-      amount: 0
-    });
-
-    this.errorMessage = '';
-    this.closeModal();
   }
 
   openPinModal(): void {
@@ -281,12 +299,11 @@ export class Payments implements OnInit {
     });
   }
 
-  getSaleById(id: number): Sale | undefined {
-    return this.dataService.getSales().find(s => s.id === id);
-  }
-
   getCustomerOpenBalance(customerId: number): number {
-    return this.dataService.getCustomerOpenBalance(customerId);
+    // Calcular saldo a partir das vendas locais carregadas
+    return this.salesForCustomer
+      .filter(s => s.type === 'PRAZO')
+      .reduce((sum, s) => sum + s.remainingBalance, 0);
   }
 
   get paginatedFilteredCustomers(): Customer[] {
