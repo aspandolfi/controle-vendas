@@ -27,6 +27,12 @@ coverage/
 .nyc_output/
 karma.conf.js
 
+# Cypress outputs (but keep cypress/ folder for tests)
+cypress/screenshots/
+cypress/videos/
+cypress/results/
+*.mp4
+
 # Environment
 .env
 .env.local

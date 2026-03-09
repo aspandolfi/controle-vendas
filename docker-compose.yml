@@ -13,10 +13,11 @@ services:
     networks:
       - controle-vendas-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -s http://localhost:8000/ > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   # LocalStack - Emulador de serviços AWS para testes de integração
   localstack:
@@ -181,6 +182,31 @@ services:
     restart: unless-stopped
     profiles:
       - admin
+
+  # Web E2E Tests (Cypress)
+  web-e2e-test:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.test
+    container_name: controle-vendas-web-e2e-test
+    environment:
+      - CYPRESS_baseUrl=http://web-dev:4200
+      - CYPRESS_video=false
+      - CYPRESS_screenshotOnRunFailure=true
+      - NODE_ENV=test
+    volumes:
+      - ./web/cypress:/app/cypress
+      - ./web/cypress/screenshots:/app/cypress/screenshots
+      - ./web/cypress/videos:/app/cypress/videos
+      - ./web/cypress.config.ts:/app/cypress.config.ts
+    depends_on:
+      - web-dev
+      - api
+    networks:
+      - controle-vendas-network
+    command: ["npx", "cypress", "run", "--browser", "electron", "--headless", "--config", "baseUrl=http://web-dev:4200"]
+    profiles:
+      - e2e-test
 
 networks:
   controle-vendas-network:

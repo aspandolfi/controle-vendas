@@ -144,14 +144,75 @@ npm start
 ### Executar Testes
 
 ```bash
-# Backend
+# Backend - Testes unitários
 cd api
 pytest --cov=src --cov-report=html
 
-# Frontend
+# Frontend - Testes unitários
 cd web
 npm test
+
+# Frontend - Testes E2E (local)
+cd web
+npm run e2e:headless
 ```
+
+### Executar Testes E2E via Docker
+
+Para executar os testes E2E de forma completamente isolada usando Docker:
+
+**Usando Make (Recomendado):**
+```bash
+# Na raiz do projeto
+make test-e2e              # Executa testes E2E via Docker
+make test-all              # Executa todos os testes (API + Web + E2E)
+make clean-screenshots     # Limpa screenshots de testes
+```
+
+**Usando Docker Compose:**
+```bash
+# Na raiz do projeto
+docker-compose --profile dev up -d           # Inicia ambiente
+sleep 15                                     # Aguarda serviços
+docker-compose --profile e2e-test run --rm web-e2e-test  # Executa testes
+docker-compose --profile dev down            # Para ambiente
+```
+
+**Usando Scripts:**
+```bash
+# Linux/macOS
+cd web
+./scripts/run-e2e-tests.sh
+
+# Windows
+cd web
+scripts\run-e2e-tests.bat
+```
+
+**Usando NPM:**
+```bash
+cd web
+npm run e2e:docker:up      # Inicia ambiente
+npm run e2e:docker         # Executa testes
+npm run e2e:docker:down    # Para ambiente
+```
+
+**Suites de Testes Disponíveis:**
+- 🔐 Login e Autenticação (4 testes)
+- 💰 Vendas à Vista (6 testes)
+- 📋 Vendas a Prazo (9 testes)
+- 👥 Gestão de Clientes (7 testes)
+- 💳 Pagamentos (6 testes)
+- 📊 Dashboard e Estatísticas (4 testes)
+- 🧭 Navegação (5 testes)
+- 🔄 Fluxos Completos (5 testes)
+- 🔗 Integração Clientes (6 testes)
+- 🔗 Integração Vendas (6 testes)
+- ✅ Validação de Formulários (10 testes)
+- ⚠️ Tratamento de Erros (15 testes)
+- **Total: ~83 testes E2E**
+
+📖 **Documentação completa dos testes:** [web/cypress/README-DOCKER.md](web/cypress/README-DOCKER.md)
 
 ### Build de Produção
 
