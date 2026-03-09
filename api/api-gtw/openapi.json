@@ -1,0 +1,646 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Controle de Vendas API",
+    "description": "API para gerenciamento de vendas, clientes e pagamentos",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@yourdomain.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{apiId}.execute-api.{region}.amazonaws.com/{stage}",
+      "variables": {
+        "apiId": {
+          "default": "api-id"
+        },
+        "region": {
+          "default": "sa-east-1"
+        },
+        "stage": {
+          "default": "dev"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Verifica o status de saúde da API",
+        "operationId": "healthCheck",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "API está saudável",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "summary": "Listar Clientes",
+        "description": "Retorna uma lista de todos os clientes",
+        "operationId": "listCustomers",
+        "tags": ["Customers"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Número máximo de resultados",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clientes retornada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Criar Cliente",
+        "description": "Cria um novo cliente",
+        "operationId": "createCustomer",
+        "tags": ["Customers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cliente criado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers/{customerId}": {
+      "get": {
+        "summary": "Obter Cliente",
+        "description": "Retorna detalhes de um cliente específico",
+        "operationId": "getCustomer",
+        "tags": ["Customers"],
+        "parameters": [
+          {
+            "name": "customerId",
+            "in": "path",
+            "required": true,
+            "description": "ID do cliente",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sales": {
+      "get": {
+        "summary": "Listar Vendas",
+        "description": "Retorna uma lista de todas as vendas",
+        "operationId": "listSales",
+        "tags": ["Sales"],
+        "parameters": [
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "Filtrar por ID do cliente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Tipo de venda (AVULSO ou PRAZO)",
+            "schema": {
+              "type": "string",
+              "enum": ["AVULSO", "PRAZO"]
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Data inicial (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Data final (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de vendas retornada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Criar Venda",
+        "description": "Registra uma nova venda",
+        "operationId": "createSale",
+        "tags": ["Sales"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSaleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Venda criada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments": {
+      "get": {
+        "summary": "Listar Pagamentos",
+        "description": "Retorna uma lista de todos os pagamentos",
+        "operationId": "listPayments",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "Filtrar por ID do cliente",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Data inicial (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Data final (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de pagamentos retornada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrar Pagamento",
+        "description": "Registra um novo pagamento",
+        "operationId": "createPayment",
+        "tags": ["Payments"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pagamento registrado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requisição inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "healthy"
+          },
+          "service": {
+            "type": "string",
+            "example": "controle-vendas-api"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0.0"
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID único do cliente",
+            "example": "customer-123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nome do cliente",
+            "example": "João Silva"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data de criação"
+          }
+        }
+      },
+      "CreateCustomerRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nome do cliente",
+            "minLength": 3,
+            "maxLength": 100,
+            "example": "João Silva"
+          }
+        }
+      },
+      "CustomerResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Customer created"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          }
+        }
+      },
+      "CustomerListResponse": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Customer"
+            }
+          }
+        }
+      },
+      "Sale": {
+        "type": "object",
+        "required": ["id", "customerId", "date", "type", "quantity", "totalValue"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID único da venda",
+            "example": "sale-456"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "ID do cliente",
+            "example": "customer-123"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data da venda"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["AVULSO", "PRAZO"],
+            "description": "Tipo de venda"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quantidade vendida",
+            "example": 10
+          },
+          "totalValue": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0,
+            "description": "Valor total da venda",
+            "example": 150.50
+          },
+          "remainingBalance": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0,
+            "description": "Saldo restante",
+            "example": 75.25
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data de criação"
+          }
+        }
+      },
+      "CreateSaleRequest": {
+        "type": "object",
+        "required": ["customerId", "date", "type", "quantity", "totalValue"],
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "ID do cliente"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data da venda"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["AVULSO", "PRAZO"],
+            "description": "Tipo de venda"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quantidade"
+          },
+          "totalValue": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0.01,
+            "description": "Valor total"
+          }
+        }
+      },
+      "SaleResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Sale created"
+          },
+          "sale": {
+            "$ref": "#/components/schemas/Sale"
+          }
+        }
+      },
+      "SaleListResponse": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sale"
+            }
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "required": ["id", "customerId", "date", "amount"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID único do pagamento",
+            "example": "payment-789"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "ID do cliente",
+            "example": "customer-123"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data do pagamento"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0.01,
+            "description": "Valor do pagamento",
+            "example": 50.00
+          },
+          "saleId": {
+            "type": "string",
+            "description": "ID da venda (opcional)",
+            "example": "sale-456"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data de criação"
+          }
+        }
+      },
+      "CreatePaymentRequest": {
+        "type": "object",
+        "required": ["customerId", "date", "amount"],
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "ID do cliente"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data do pagamento"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal",
+            "minimum": 0.01,
+            "description": "Valor do pagamento"
+          },
+          "saleId": {
+            "type": "string",
+            "description": "ID da venda (opcional)"
+          }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Payment created"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          }
+        }
+      },
+      "PaymentListResponse": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Mensagem de erro"
+          },
+          "message": {
+            "type": "string",
+            "description": "Descrição detalhada do erro"
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "Código de status HTTP"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Endpoints de monitoramento"
+    },
+    {
+      "name": "Customers",
+      "description": "Operações relacionadas a clientes"
+    },
+    {
+      "name": "Sales",
+      "description": "Operações relacionadas a vendas"
+    },
+    {
+      "name": "Payments",
+      "description": "Operações relacionadas a pagamentos"
+    }
+  ]
+}

@@ -24,15 +24,15 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let c of filteredCustomers">
+            <tr *ngFor="let c of paginatedFilteredCustomers">
               <td>{{ c.name }}</td>
               <td>R$ {{ getCustomerOpenBalance(c.id) | number: '1.2-2' }}</td>
               <td>
                 <button 
                   class="btn btn-sm btn-primary" 
-                  (click)="selectCustomer(c.id)"
+                  (click)="selectCustomerAndOpenModal(c.id)"
                 >
-                  Selecionar
+                  Nova Venda
                 </button>
               </td>
             </tr>
@@ -45,20 +45,75 @@
         </table>
       </div>
 
-      <div class="alert alert-info" *ngIf="selectedCustomerId">
-        <strong>Cliente selecionado:</strong> {{ getCustomerName(selectedCustomerId) }}
+      <app-pagination 
+        [currentPage]="currentPageSearch" 
+        [totalPages]="totalPagesSearch"
+        (pageChange)="onPageChangeSearch($event)"
+      ></app-pagination>
+
+      <div class="alert alert-info d-flex justify-content-between align-items-center" *ngIf="selectedCustomerId">
+        <div>
+          <strong>Cliente selecionado:</strong> {{ getCustomerName(selectedCustomerId) }}
+        </div>
+        <button class="btn btn-primary" (click)="openModal()">
+          Nova Venda
+        </button>
       </div>
     </div>
   </div>
 
-  <div class="row g-3" *ngIf="selectedCustomerId">
-    <!-- Form venda -->
-    <div class="col-lg-5">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Nova venda a prazo</h5>
+  <!-- Lista vendas -->
+  <div class="card shadow-sm" *ngIf="selectedCustomerId">
+    <div class="card-body">
+      <h5 class="card-title">Vendas deste cliente</h5>
 
-          <form [formGroup]="saleForm" (ngSubmit)="saveSale()">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Valor</th>
+              <th>Pagamento</th>
+              <th>Saldo em aberto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of paginatedSalesForCustomer">
+              <td>{{ s.date | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ s.description }}</td>
+              <td>R$ {{ s.totalAmount | number: '1.2-2' }}</td>
+              <td>{{ getPaymentMethodLabel(s.paymentMethod) }}</td>
+              <td>R$ {{ s.remainingBalance | number: '1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="salesForCustomer.length === 0">
+              <td colspan="5" class="text-center text-muted">
+                Nenhuma venda registrada para este cliente.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination 
+        [currentPage]="currentPageSales" 
+        [totalPages]="totalPagesSales"
+        (pageChange)="onPageChangeSales($event)"
+      ></app-pagination>
+
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal" [class.show]="showModal" [style.display]="showModal ? 'block' : 'none'" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Nova venda a prazo</h5>
+          <button type="button" class="btn-close" (click)="closeModal()" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form [formGroup]="saleForm" (ngSubmit)="saveSale()" id="saleForm">
             <div class="mb-3">
               <label class="form-label">Descrição</label>
               <input type="text" class="form-control" formControlName="description" />
@@ -74,50 +129,28 @@
               <input type="number" step="0.01" class="form-control" formControlName="totalAmount" />
             </div>
 
-            <div class="d-grid">
-              <button type="submit" class="btn btn-primary">
-                Registrar venda
-              </button>
+            <div class="mb-3">
+              <label class="form-label">Método de Pagamento</label>
+              <select class="form-select" formControlName="paymentMethod">
+                <option value="DINHEIRO">Dinheiro</option>
+                <option value="PIX">Pix</option>
+                <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                <option value="CARTAO_CREDITO_PARCELADO">Cartão de Crédito Parcelado</option>
+                <option value="CARTAO_DEBITO">Cartão de Débito</option>
+              </select>
             </div>
           </form>
         </div>
-      </div>
-    </div>
-
-    <!-- Lista vendas -->
-    <div class="col-lg-7">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Vendas deste cliente</h5>
-
-          <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Data</th>
-                  <th>Descrição</th>
-                  <th>Valor</th>
-                  <th>Saldo em aberto</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let s of salesForCustomer">
-                  <td>{{ s.date | date: 'dd/MM/yyyy' }}</td>
-                  <td>{{ s.description }}</td>
-                  <td>R$ {{ s.totalAmount | number: '1.2-2' }}</td>
-                  <td>R$ {{ s.remainingBalance | number: '1.2-2' }}</td>
-                </tr>
-                <tr *ngIf="salesForCustomer.length === 0">
-                  <td colspan="4" class="text-center text-muted">
-                    Nenhuma venda registrada para este cliente.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">
+            Cancelar
+          </button>
+          <button type="submit" form="saleForm" class="btn btn-primary">
+            Registrar venda
+          </button>
         </div>
       </div>
     </div>
   </div>
+  <div class="modal-backdrop fade" [class.show]="showModal" *ngIf="showModal"></div>
 </section>

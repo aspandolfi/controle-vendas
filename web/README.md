@@ -2,6 +2,30 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.0.
 
+## Configuração da API
+
+O projeto agora utiliza serviços HTTP para se comunicar com a API backend. A URL da API pode ser configurada nos arquivos de ambiente:
+
+- **Desenvolvimento**: `src/environments/environment.ts`
+- **Produção**: `src/environments/environment.prod.ts`
+
+### Configuração Local
+
+Por padrão, a aplicação está configurada para se conectar à API local em `http://localhost:8000`. Para iniciar a API localmente:
+
+```bash
+cd ../api
+pip install -r requirements.txt -r requirements-dev.txt
+python -m uvicorn src.local_server:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Serviços Implementados
+
+- **CustomerService**: Gerenciamento de clientes (CRUD)
+- **SaleService**: Gerenciamento de vendas (à vista e a prazo)
+- **PaymentService**: Gerenciamento de pagamentos
+- **UserService**: Autenticação e gerenciamento de usuários (local)
+
 ## Development server
 
 To start a local development server, run:

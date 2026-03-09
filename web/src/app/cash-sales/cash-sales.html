@@ -37,6 +37,17 @@
               />
             </div>
 
+            <div class="mb-3">
+              <label class="form-label">Método de Pagamento</label>
+              <select class="form-select" formControlName="paymentMethod">
+                <option value="DINHEIRO">Dinheiro</option>
+                <option value="PIX">Pix</option>
+                <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                <option value="CARTAO_CREDITO_PARCELADO">Cartão de Crédito Parcelado</option>
+                <option value="CARTAO_DEBITO">Cartão de Débito</option>
+              </select>
+            </div>
+
             <div class="d-grid">
               <button type="submit" class="btn btn-primary">
                 Registrar venda
@@ -59,22 +70,30 @@
                   <th>Data</th>
                   <th>Descrição</th>
                   <th>Valor</th>
+                  <th>Pagamento</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let s of sales">
+                <tr *ngFor="let s of paginatedSales">
                   <td>{{ s.date | date: 'dd/MM/yyyy' }}</td>
                   <td>{{ s.description }}</td>
                   <td>R$ {{ s.totalAmount | number: '1.2-2' }}</td>
+                  <td>{{ getPaymentMethodLabel(s.paymentMethod) }}</td>
                 </tr>
                 <tr *ngIf="sales.length === 0">
-                  <td colspan="3" class="text-center text-muted">
+                  <td colspan="4" class="text-center text-muted">
                     Nenhuma venda avulsa registrada.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <app-pagination 
+            [currentPage]="currentPage" 
+            [totalPages]="totalPages"
+            (pageChange)="onPageChange($event)"
+          ></app-pagination>
 
         </div>
       </div>

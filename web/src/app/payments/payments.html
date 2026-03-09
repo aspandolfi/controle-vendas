@@ -24,7 +24,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let c of filteredCustomers">
+            <tr *ngFor="let c of paginatedFilteredCustomers">
               <td>{{ c.name }}</td>
               <td>R$ {{ getCustomerOpenBalance(c.id) | number: '1.2-2' }}</td>
               <td>
@@ -44,6 +44,12 @@
           </tbody>
         </table>
       </div>
+
+      <app-pagination 
+        [currentPage]="currentPageSearch" 
+        [totalPages]="totalPagesSearch"
+        (pageChange)="onPageChangeSearch($event)"
+      ></app-pagination>
 
     </div>
   </div>
@@ -111,6 +117,9 @@
               <button type="button" class="btn btn-secondary" (click)="closeModal()">
                 Cancelar
               </button>
+              <button type="button" class="btn btn-info" (click)="printPayment()">
+                <i class="bi bi-printer"></i> Imprimir
+              </button>
               <button type="submit" class="btn btn-primary">
                 Registrar pagamento
               </button>
@@ -160,7 +169,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let p of filteredPaymentByCustomer">
+            <tr *ngFor="let p of paginatedPayments">
               <td>{{ p.date | date: 'dd/MM/yyyy' }}</td>
               <td>{{ p.customerName }}</td>
               <td>Abatimento de saldo</td>
@@ -174,6 +183,12 @@
           </tbody>
         </table>
       </div>
+
+      <app-pagination 
+        [currentPage]="currentPagePayments" 
+        [totalPages]="totalPagesPayments"
+        (pageChange)="onPageChangePayments($event)"
+      ></app-pagination>
 
     </div>
   </div>
@@ -233,4 +248,9 @@
     </div>
   </div>
   <div class="modal-backdrop fade" [class.show]="showPinModal" *ngIf="showPinModal" style="z-index: 1055;"></div>
+
+  <!-- Container de impressão (oculto na tela, visível na impressão) -->
+  <div class="print-only" *ngIf="printData">
+    <app-payment-print [data]="printData"></app-payment-print>
+  </div>
 </section>

@@ -1,0 +1,28 @@
+# Dockerfile para execução de testes de integração
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt requirements-dev.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+
+# Copy application code
+COPY . .
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV AWS_DEFAULT_REGION=sa-east-1
+ENV POWERTOOLS_SERVICE_NAME=controle-vendas-api-test
+ENV POWERTOOLS_TRACE_DISABLED=true
+
+# Default command runs all tests
+CMD ["pytest", "tests/", "-v", "--tb=short", "--color=yes"]

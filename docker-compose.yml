@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # DynamoDB Local
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: controle-vendas-dynamodb
+    ports:
+      - "8001:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    networks:
+      - controle-vendas-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8000/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # LocalStack - Emulador de serviços AWS para testes de integração
+  localstack:
+    image: localstack/localstack:latest
+    container_name: controle-vendas-localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=dynamodb,lambda,apigateway,s3,cloudwatch,iam
+      - DEBUG=0
+      - AWS_DEFAULT_REGION=sa-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - controle-vendas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    profiles:
+      - integration-test
+
+  # API Test Runner - Para executar testes via Docker
+  api-test:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.test
+    container_name: controle-vendas-api-test
+    environment:
+      - AWS_REGION=sa-east-1
+      - AWS_DEFAULT_REGION=sa-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - POWERTOOLS_SERVICE_NAME=controle-vendas-api-test
+      - POWERTOOLS_TRACE_DISABLED=true
+      - POWERTOOLS_LOG_LEVEL=DEBUG
+    volumes:
+      - ./api/src:/app/src
+      - ./api/tests:/app/tests
+      - ./api/htmlcov:/app/htmlcov
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    networks:
+      - controle-vendas-network
+    command: ["pytest", "tests/", "-v", "--ignore=tests/integration/", "--cov=src", "--cov-report=html", "--cov-report=term"]
+    profiles:
+      - test
+
+  # API Integration Test Runner - Para testes de integração via Docker
+  api-integration-test:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.test
+    container_name: controle-vendas-api-integration-test
+    environment:
+      - AWS_REGION=sa-east-1
+      - AWS_DEFAULT_REGION=sa-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - DYNAMODB_TABLE_NAME=controle-vendas-integration-test
+      - POWERTOOLS_SERVICE_NAME=controle-vendas-api-integration-test
+      - POWERTOOLS_TRACE_DISABLED=true
+      - POWERTOOLS_LOG_LEVEL=DEBUG
+    volumes:
+      - ./api/src:/app/src
+      - ./api/tests:/app/tests
+      - ./api/htmlcov:/app/htmlcov
+    depends_on:
+      localstack:
+        condition: service_healthy
+    networks:
+      - controle-vendas-network
+    command: ["pytest", "tests/integration/", "-v", "--tb=short", "--color=yes"]
+    profiles:
+      - integration-test
+
+  # API Backend (Python Lambda)
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: controle-vendas-api
+    ports:
+      - "8000:8000"
+    environment:
+      - AWS_REGION=sa-east-1
+      - AWS_DEFAULT_REGION=sa-east-1
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+      - POWERTOOLS_SERVICE_NAME=controle-vendas-api
+      - POWERTOOLS_LOG_LEVEL=INFO
+      - TABLE_NAME=controle-vendas-dev
+    volumes:
+      - ./api/src:/app/src
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    networks:
+      - controle-vendas-network
+    restart: unless-stopped
+
+  # Web Frontend (Angular) - Development Mode
+  web-dev:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    container_name: controle-vendas-web-dev
+    ports:
+      - "4200:4200"
+    environment:
+      - API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+      - /app/node_modules  # Prevent overwriting node_modules
+    networks:
+      - controle-vendas-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # Web Frontend (Angular) - Production Mode
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: controle-vendas-web
+    ports:
+      - "8080:80"
+    environment:
+      - API_URL=http://localhost:8000
+    networks:
+      - controle-vendas-network
+    restart: unless-stopped
+    profiles:
+      - prod
+
+  # DynamoDB Admin UI (optional)
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    container_name: controle-vendas-dynamodb-admin
+    ports:
+      - "8002:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb-local:8000
+      - AWS_REGION=sa-east-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    depends_on:
+      - dynamodb-local
+    networks:
+      - controle-vendas-network
+    restart: unless-stopped
+    profiles:
+      - admin
+
+  # Web E2E Tests (Cypress)
+  web-e2e-test:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.test
+    container_name: controle-vendas-web-e2e-test
+    environment:
+      - CYPRESS_baseUrl=http://web-dev:4200
+      - CYPRESS_video=false
+      - CYPRESS_screenshotOnRunFailure=true
+      - NODE_ENV=test
+    volumes:
+      - ./web/cypress:/app/cypress
+      - ./web/cypress/screenshots:/app/cypress/screenshots
+      - ./web/cypress/videos:/app/cypress/videos
+      - ./web/cypress.config.ts:/app/cypress.config.ts
+    depends_on:
+      - web-dev
+      - api
+    networks:
+      - controle-vendas-network
+    command: ["npx", "cypress", "run", "--browser", "electron", "--headless", "--config", "baseUrl=http://web-dev:4200"]
+    profiles:
+      - e2e-test
+
+networks:
+  controle-vendas-network:
+    driver: bridge
+
+volumes:
+  dynamodb-data:
+    driver: local

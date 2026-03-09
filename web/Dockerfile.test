@@ -1,0 +1,28 @@
+# Dockerfile for E2E Testing with Cypress
+FROM cypress/included:13.15.2
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code and test files
+COPY . .
+
+# Copy Cypress configuration
+COPY cypress.config.ts ./
+COPY cypress ./cypress
+
+# Set environment variables for Cypress
+ENV CYPRESS_baseUrl=http://web:4200
+ENV CYPRESS_video=false
+ENV CYPRESS_screenshotOnRunFailure=true
+
+# Create directory for test results
+RUN mkdir -p /app/cypress/screenshots /app/cypress/videos /app/cypress/results
+
+# Default command runs all E2E tests using Electron
+CMD ["npx", "cypress", "run", "--browser", "electron", "--headless"]

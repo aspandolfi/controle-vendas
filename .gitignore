@@ -41,3 +41,64 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AWS SAM
+.aws-sam/
+
+# Environment variables
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+.dockerignore.local
+
+# Terraform
+*.tfvars
+!*.tfvars.example
+!api/infra/backends/*.tfvars
+!api/infra/environments/*.tfvars
+!web/infra/backends/*.tfvars
+!web/infra/environments/*.tfvars
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+deployment.zip

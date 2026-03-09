@@ -1,6 +1,6 @@
 {
   "name": "controle-vendas",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -8,7 +8,15 @@
     "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "e2e": "cypress open",
+    "e2e:headless": "cypress run",
+    "e2e:docker": "cd .. && docker-compose --profile e2e-test run --rm web-e2e-test",
+    "e2e:docker:build": "cd .. && docker-compose build web-e2e-test",
+    "e2e:docker:up": "cd .. && docker-compose --profile dev up -d web-dev api dynamodb-local",
+    "e2e:docker:down": "cd .. && docker-compose --profile dev down",
+    "test:all": "npm test && npm run e2e:headless",
+    "test:all:docker": "npm run e2e:docker"
   },
   "prettier": {
     "printWidth": 100,
@@ -40,6 +48,7 @@
     "@angular/build": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
+    "cypress": "^15.11.0",
     "jsdom": "^27.1.0",
     "less": "^4.2.0",
     "typescript": "~5.9.2",

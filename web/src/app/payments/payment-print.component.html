@@ -1,0 +1,46 @@
+<div class="print-container">
+  <div class="header">
+    <h1>Vendas em Aberto</h1>
+    <p>Controle de Vendas</p>
+  </div>
+  
+  <div class="info-section">
+    <div class="info-row">
+      <span class="info-label">Cliente:</span>
+      <span>{{ data.customerName }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Data:</span>
+      <span>{{ formatDate(data.date) }}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Saldo em Aberto:</span>
+      <span>{{ formatCurrency(data.openBalance) }}</span>
+    </div>
+  </div>
+
+  <div *ngIf="data.sales.length > 0">
+    <h3>Vendas em Aberto</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Descrição</th>
+          <th>Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let sale of data.sales">
+          <td>{{ formatDate(sale.date) }}</td>
+          <td>{{ sale.description }}</td>
+          <td>{{ formatCurrency(sale.remainingBalance) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p>Este é um comprovante de pagamento.</p>
+    <p>Data de emissão: {{ emissionDate }}</p>
+  </div>
+</div>

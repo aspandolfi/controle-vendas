@@ -1,0 +1,8 @@
+# Backend configuration for Terraform state
+# Use: terraform init -backend-config=backend-dev.tfvars
+
+bucket         = "your-terraform-state-bucket"
+key            = "controle-vendas/dev/terraform.tfstate"
+region         = "sa-east-1"
+encrypt        = true
+dynamodb_table = "terraform-state-lock"

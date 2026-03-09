@@ -1,0 +1,17 @@
+# Development Environment
+environment = "dev"
+aws_region  = "sa-east-1"
+
+# Lambda Configuration
+lambda_memory_size  = 512
+lambda_timeout      = 30
+enable_xray_tracing = true
+
+# DynamoDB Configuration
+dynamodb_billing_mode = "PAY_PER_REQUEST"
+
+# Logging
+log_retention_days = 7
+
+# CORS
+cors_allowed_origins = ["http://localhost:4200", "https://dev.yourdomain.com"]
